@@ -27,7 +27,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 
 nav{display:flex;align-items:center;justify-content:space-between;padding:13px 20px;
   background:rgba(14,14,24,.85);border:1px solid var(--border);border-radius:var(--r-xl);
-  backdrop-filter:blur(16px);margin-bottom:28px;animation:fadeUp .35s ease both}
+  backdrop-filter:blur(16px);margin-bottom:28px;animation:fadeUp .35s ease both;flex-wrap:wrap;gap:10px}
 .nav-brand{display:flex;align-items:center;gap:12px}
 .nav-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--purple),var(--cyan));
   border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
@@ -35,11 +35,14 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:13px 2
   background:linear-gradient(135deg,var(--purple3),var(--cyan));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .nav-sub{font-size:10px;color:var(--muted);letter-spacing:.08em;margin-top:1px}
-.nav-right{display:flex;align-items:center;gap:10px}
+.nav-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .month-pick{padding:7px 12px;background:var(--s2);border:1px solid var(--border);
   border-radius:100px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none}
-.btn-export{padding:7px 16px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3);
-  border-radius:100px;color:var(--cyan);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-nav{padding:7px 14px;border-radius:100px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+.btn-export{background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3);color:var(--cyan)}
+.btn-export:hover{background:rgba(34,211,238,.18)}
+.btn-import{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--gold)}
+.btn-import:hover{background:rgba(245,158,11,.18)}
 
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;animation:fadeUp .35s ease .05s both}
 @media(max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr)}}
@@ -67,7 +70,6 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:13px 2
 .panel-title{font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;font-weight:700}
 .panel-body{padding:16px}
 
-/* ── Product multi-select ── */
 .prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
 .prod-card{background:var(--s2);border:1.5px solid var(--border);border-radius:var(--r-sm);
   padding:9px 11px;cursor:pointer;transition:.15s;position:relative;user-select:none}
@@ -80,7 +82,6 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:13px 2
 .prod-name{font-size:11px;font-weight:600;margin-bottom:2px;padding-right:20px}
 .prod-price{font-size:10px;color:var(--gold);font-weight:700}
 
-/* Cart */
 .cart-section{margin-bottom:14px}
 .cart-label{font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:8px}
 .cart-empty{text-align:center;padding:16px;color:var(--muted);font-size:11px;
@@ -118,7 +119,6 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:13px 2
 .rf-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green)}
 .rf-err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--red)}
 
-/* Table */
 .search-bar{display:flex;gap:8px;margin-bottom:12px}
 .search-bar input{flex:1;padding:7px 12px;background:#07070e;border:1px solid var(--border);
   border-radius:var(--r-sm);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none}
@@ -130,9 +130,6 @@ th{padding:10px 13px;font-size:9px;letter-spacing:.1em;color:var(--muted);text-t
 td{padding:10px 13px;font-size:11px;border-bottom:1px solid rgba(30,30,53,.4);vertical-align:top}
 tr:last-child td{border-bottom:none}
 .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;white-space:nowrap}
-.tg{background:rgba(16,185,129,.15);color:#6ee7b7}
-.tp{background:rgba(139,92,246,.15);color:#c4b5fd}
-.tc{background:rgba(34,211,238,.15);color:#67e8f9}
 .pg-row{padding:11px 14px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .pg-info{font-size:10px;color:var(--muted)}
 .pg-btn{padding:5px 12px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);
@@ -147,6 +144,43 @@ tr:last-child td{border-bottom:none}
   color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10px;outline:none;text-align:right}
 
 .empty{text-align:center;padding:36px;color:var(--muted);font-size:12px}
+
+/* ── Import Modal ─────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  z-index:1000;display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:.2s}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:28px;width:100%;max-width:460px;animation:fadeUp .25s ease both;position:relative}
+.modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;margin-bottom:4px}
+.modal-sub{font-size:11px;color:var(--muted);margin-bottom:20px}
+.modal-close{position:absolute;top:18px;right:18px;background:none;border:none;
+  color:var(--muted);font-size:18px;cursor:pointer;padding:4px}
+.modal-close:hover{color:var(--text)}
+
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--r-md);padding:32px 20px;
+  text-align:center;cursor:pointer;transition:.2s;position:relative}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--gold);background:rgba(245,158,11,.05)}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-icon{font-size:28px;margin-bottom:8px}
+.drop-label{font-size:12px;color:var(--muted)}
+.drop-label strong{color:var(--gold)}
+.drop-fname{margin-top:8px;font-size:11px;color:var(--cyan);display:none}
+
+.import-info{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);
+  border-radius:var(--r-sm);padding:10px 13px;font-size:11px;color:var(--gold);margin:14px 0;line-height:1.6}
+.import-info b{color:var(--text)}
+
+.btn-do-import{width:100%;padding:11px;border:none;border-radius:var(--r-sm);
+  background:linear-gradient(135deg,var(--gold),#d97706);color:#000;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:.2s;margin-top:4px}
+.btn-do-import:hover{opacity:.9;transform:translateY(-1px)}
+.btn-do-import:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+.import-result{margin-top:12px;padding:10px 13px;border-radius:var(--r-sm);font-size:12px;display:none}
+.ir-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green)}
+.ir-err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--red)}
+
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>
@@ -159,18 +193,46 @@ tr:last-child td{border-bottom:none}
     <div class="nav-logo">💰</div>
     <div>
       <div class="nav-name">INSIDEX ACCOUNTING</div>
-      <div class="nav-sub">ระบบบัญชีร้าน · Multi-item</div>
+      <div class="nav-sub">ระบบบัญชีร้าน · Auto Backup</div>
     </div>
   </div>
   <div class="nav-right">
     <input type="month" id="monthPick" class="month-pick" title="กรองตามเดือน"/>
-    <button class="btn-export" onclick="exportCSV()">📥 Export CSV</button>
+    <button class="btn-nav btn-export" onclick="exportCSV()">📥 Export CSV</button>
+    <button class="btn-nav btn-import" onclick="openImport()">📤 Import Backup</button>
     <span id="nav-username" style="font-size:11px;color:var(--muted);padding:7px 12px;background:var(--s2);border:1px solid var(--border);border-radius:100px">👤 —</span>
     <button onclick="doLogout()" style="padding:7px 14px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.25);border-radius:100px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🚪 ออก</button>
   </div>
 </nav>
 
+<!-- Import Modal -->
+<div class="modal-overlay" id="import-modal" onclick="if(event.target===this)closeImport()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeImport()">✕</button>
+    <div class="modal-title">📤 Import Backup CSV</div>
+    <div class="modal-sub">นำข้อมูลจากไฟล์ backup กลับเข้าระบบ</div>
 
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="import-file" accept=".csv" onchange="onFileSelect(this)"/>
+      <div class="drop-icon">📂</div>
+      <div class="drop-label">ลากไฟล์มาวาง หรือ <strong>คลิกเพื่อเลือก</strong></div>
+      <div class="drop-label" style="margin-top:4px;font-size:10px">รองรับไฟล์ .csv จาก Export / Backup เท่านั้น</div>
+      <div class="drop-fname" id="drop-fname"></div>
+    </div>
+
+    <div class="import-info">
+      <b>⚠️ หมายเหตุ</b><br/>
+      • ระบบจะ <b>ข้ามบิลที่ซ้ำ</b> โดยอัตโนมัติ (เทียบจาก วันที่ + ลูกค้า)<br/>
+      • ราคาสินค้าจะใช้ค่าในไฟล์ CSV<br/>
+      • ไม่ลบข้อมูลเดิม — เพิ่มเท่านั้น
+    </div>
+
+    <button class="btn-do-import" id="btn-do-import" onclick="doImport()" disabled>
+      📤 นำเข้าข้อมูล
+    </button>
+    <div class="import-result" id="import-result"></div>
+  </div>
+</div>
 
 <div class="stats-row">
   <div class="stat g"><span class="stat-icon">💵</span>
@@ -214,25 +276,18 @@ tr:last-child td{border-bottom:none}
       <span id="cart-count" style="font-size:10px;color:var(--purple);font-weight:700"></span>
     </div>
     <div class="panel-body">
-
       <div class="field">
         <label>ชื่อลูกค้า (Discord)</label>
         <input type="text" id="f-customer" placeholder="เช่น shxcry" autocomplete="off"/>
       </div>
-
-      <!-- Product multi-select -->
       <div style="font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:8px">
         เลือกสินค้า (เลือกได้หลายรายการ)
       </div>
       <div class="prod-grid" id="prod-grid"></div>
-
-      <!-- Cart -->
       <div class="cart-section">
         <div class="cart-label">🛒 รายการที่เลือก</div>
         <div id="cart-list"><div class="cart-empty">ยังไม่ได้เลือกสินค้า</div></div>
       </div>
-
-      <!-- Cart total -->
       <div class="cart-total" id="cart-total-box" style="display:none">
         <div>
           <div class="cart-total-label">ยอดรวมบิลนี้</div>
@@ -240,7 +295,6 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="cart-total-val" id="cart-total-val">0 ฿</div>
       </div>
-
       <div class="field">
         <label>ช่องทางรับเงิน</label>
         <select id="f-method">
@@ -253,7 +307,6 @@ tr:last-child td{border-bottom:none}
         <label>หมายเหตุ (ไม่บังคับ)</label>
         <input type="text" id="f-note" placeholder="เช่น ลูกค้าประจำ, ปรับรอบ"/>
       </div>
-
       <button class="btn-add" id="btn-add" onclick="addOrder()">💾 บันทึกบิล</button>
       <div class="result-flash" id="f-result"></div>
     </div>
@@ -298,13 +351,10 @@ let products=[], cart=[], currentPage=1, searchQ='', filterMonth='', lineChart, 
 const PER_PAGE=15;
 const METHOD={bank:'🏦 โอน',truemoney:'💚 True',other:'📦 อื่นๆ'};
 
-// ── Init ──────────────────────────────────────────────
 async function init(){
-  // เช็ค login ก่อน
-  const me = await fetch('/api/auth/me').then(r=>r.json());
-  if(!me.logged_in){ window.location.href='/login'; return; }
-  document.getElementById('nav-username').textContent = '👤 ' + me.username;
-
+  const me=await fetch('/api/auth/me').then(r=>r.json());
+  if(!me.logged_in){window.location.href='/login';return;}
+  document.getElementById('nav-username').textContent='👤 '+me.username;
   const r=await fetch('/api/products'); products=await r.json();
   renderProdGrid();
   const m=document.getElementById('monthPick');
@@ -315,7 +365,6 @@ async function init(){
   await loadDashboard(); await loadTable();
 }
 
-// ── Product Grid ──────────────────────────────────────
 function renderProdGrid(){
   document.getElementById('prod-grid').innerHTML=products.map(p=>`
     <div class="prod-card" id="pc-${p.key}" onclick="toggleProd('${p.key}')">
@@ -329,45 +378,35 @@ function toggleProd(key){
   const prod=products.find(p=>p.key===key);
   const idx=cart.findIndex(c=>c.key===key);
   if(idx>=0){
-    // deselect
     cart.splice(idx,1);
     document.getElementById('pc-'+key).classList.remove('active');
     document.getElementById('chk-'+key).textContent='';
   } else {
-    // add
-    cart.push({key:prod.key, name:prod.name, listPrice:prod.price, actualPrice:prod.price});
+    cart.push({key:prod.key,name:prod.name,listPrice:prod.price,actualPrice:prod.price});
     document.getElementById('pc-'+key).classList.add('active');
     document.getElementById('chk-'+key).textContent='✓';
   }
   renderCart();
 }
 
-// ── Cart ──────────────────────────────────────────────
 function renderCart(){
   const el=document.getElementById('cart-list');
   const countEl=document.getElementById('cart-count');
   const totalBox=document.getElementById('cart-total-box');
-
   countEl.textContent=cart.length?`${cart.length} รายการ`:'';
-
   if(!cart.length){
     el.innerHTML='<div class="cart-empty">ยังไม่ได้เลือกสินค้า</div>';
-    totalBox.style.display='none';
-    return;
+    totalBox.style.display='none'; return;
   }
-
   el.innerHTML=cart.map((c,i)=>`
     <div class="cart-item">
       <div class="cart-item-name">${c.name}</div>
       <span class="cart-item-list">${c.listPrice.toLocaleString()}</span>
       <input class="cart-price-inp" type="text" inputmode="numeric" id="cpi-${i}"
-        value="${c.actualPrice}"
-        onchange="updateCartPrice(${i},this.value)"
-        onfocus="this.select()" title="แก้ราคา"/>
+        value="${c.actualPrice}" onchange="updateCartPrice(${i},this.value)" onfocus="this.select()" title="แก้ราคา"/>
       <button class="cart-remove" onclick="removeCartItem(${i})">×</button>
     </div>`).join('');
-
-  const totalList  =cart.reduce((s,c)=>s+c.listPrice,0);
+  const totalList=cart.reduce((s,c)=>s+c.listPrice,0);
   const totalActual=cart.reduce((s,c)=>s+c.actualPrice,0);
   const disc=totalList-totalActual;
   document.getElementById('cart-total-val').textContent=totalActual.toLocaleString()+' ฿';
@@ -375,56 +414,36 @@ function renderCart(){
   totalBox.style.display='flex';
 }
 
-function updateCartPrice(idx,val){
-  cart[idx].actualPrice=parseInt(val)||0;
-  updateCartTotals();
-}
-
+function updateCartPrice(idx,val){cart[idx].actualPrice=parseInt(val)||0;updateCartTotals();}
 function updateCartTotals(){
-  if(!cart.length) return;
-  const totalList  =cart.reduce((s,c)=>s+c.listPrice,0);
-  const totalActual=cart.reduce((s,c)=>s+c.actualPrice,0);
-  const disc=totalList-totalActual;
-  const tv=document.getElementById('cart-total-val');
-  const dl=document.getElementById('cart-disc-label');
-  if(tv) tv.textContent=totalActual.toLocaleString()+' ฿';
-  if(dl) dl.textContent=disc>0?`ลด ${disc.toLocaleString()} ฿`:'';
+  if(!cart.length)return;
+  const tl=cart.reduce((s,c)=>s+c.listPrice,0);
+  const ta=cart.reduce((s,c)=>s+c.actualPrice,0);
+  document.getElementById('cart-total-val').textContent=ta.toLocaleString()+' ฿';
+  document.getElementById('cart-disc-label').textContent=(tl-ta)>0?`ลด ${(tl-ta).toLocaleString()} ฿`:'';
 }
-
 function removeCartItem(idx){
-  const key=cart[idx].key;
-  cart.splice(idx,1);
+  const key=cart[idx].key; cart.splice(idx,1);
   document.getElementById('pc-'+key)?.classList.remove('active');
   document.getElementById('chk-'+key).textContent='';
   renderCart();
 }
 
-// ── Add Order ─────────────────────────────────────────
 async function addOrder(){
   const cust=document.getElementById('f-customer').value.trim();
   const box=document.getElementById('f-result');
   const btn=document.getElementById('btn-add');
-
   if(!cust){flash(box,'❌ กรุณาใส่ชื่อลูกค้า','err');return;}
   if(!cart.length){flash(box,'❌ กรุณาเลือกสินค้าอย่างน้อย 1 รายการ','err');return;}
-
   btn.disabled=true;btn.textContent='⏳ กำลังบันทึก...';
-  const r=await fetch('/api/orders',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      customer:cust,
-      method:document.getElementById('f-method').value,
+  const r=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({customer:cust,method:document.getElementById('f-method').value,
       note:document.getElementById('f-note').value.trim(),
-      items:cart.map(c=>({product_key:c.key,actual_price:c.actualPrice})),
-    }),
-  });
+      items:cart.map(c=>({product_key:c.key,actual_price:c.actualPrice}))})});
   const d=await r.json();
   btn.disabled=false;btn.textContent='💾 บันทึกบิล';
-
   if(d.success){
-    const total=d.total;
-    flash(box,`✅ บันทึก ${cart.length} รายการ รวม ${total.toLocaleString()} ฿`,'ok');
-    // reset
+    flash(box,`✅ บันทึก ${cart.length} รายการ รวม ${d.total.toLocaleString()} ฿`,'ok');
     cart=[];
     document.querySelectorAll('.prod-card').forEach(c=>c.classList.remove('active'));
     document.querySelectorAll('[id^="chk-"]').forEach(c=>c.textContent='');
@@ -432,9 +451,7 @@ async function addOrder(){
     document.getElementById('f-customer').value='';
     document.getElementById('f-note').value='';
     await loadDashboard(); await loadTable();
-  } else {
-    flash(box,'❌ '+d.error,'err');
-  }
+  } else { flash(box,'❌ '+d.error,'err'); }
 }
 
 function flash(box,msg,type){
@@ -444,7 +461,6 @@ function flash(box,msg,type){
   setTimeout(()=>box.style.display='none',4000);
 }
 
-// ── Table ─────────────────────────────────────────────
 let searchTimer;
 function onSearch(){
   clearTimeout(searchTimer);
@@ -453,17 +469,14 @@ function onSearch(){
 
 async function loadTable(){
   const params=new URLSearchParams({page:currentPage,limit:PER_PAGE,q:searchQ,month:filterMonth});
-  const r=await fetch('/api/orders?'+params);
-  const d=await r.json();
+  const r=await fetch('/api/orders?'+params); const d=await r.json();
   const total=d.total, pages=Math.ceil(total/PER_PAGE)||1;
   document.getElementById('tbl-count').textContent=total+' บิล';
   document.getElementById('pg-info').textContent=`หน้า ${currentPage}/${pages}`;
   document.getElementById('pg-prev').disabled=currentPage===1;
   document.getElementById('pg-next').disabled=currentPage>=pages;
-
   const tbody=document.getElementById('tbl-body');
   if(!d.items.length){tbody.innerHTML='<tr><td colspan="7" class="empty">ยังไม่มีรายการ</td></tr>';return;}
-
   tbody.innerHTML=d.items.map(o=>{
     const itemsHtml=o.items.map(i=>`
       <div class="item-row">
@@ -474,7 +487,6 @@ async function loadTable(){
         <button onclick="editItemPrice(${i.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:1px 3px" title="แก้ราคา">✏️</button>
         ${i.discount>0?`<span class="item-disc">-${i.discount.toLocaleString()}</span>`:''}
       </div>`).join('');
-
     const mLabel=METHOD[o.method]||o.method;
     return `<tr>
       <td style="white-space:nowrap;color:var(--muted);font-size:10px">${o.created_at}</td>
@@ -509,7 +521,6 @@ async function deleteOrder(id){
 function prevPage(){if(currentPage>1){currentPage--;loadTable();}}
 function nextPage(){currentPage++;loadTable();}
 
-// ── Dashboard ─────────────────────────────────────────
 async function loadDashboard(){
   const r=await fetch('/api/dashboard'); const d=await r.json();
   document.getElementById('s-today-rev').textContent=d.today_rev.toLocaleString()+' ฿';
@@ -553,8 +564,77 @@ async function doLogout(){
   window.location.href='/login';
 }
 
+// ── Import Modal ─────────────────────────────────────────────────
+let importFile=null;
 
+function openImport(){
+  document.getElementById('import-modal').classList.add('open');
+  document.getElementById('import-result').style.display='none';
+  document.getElementById('drop-fname').style.display='none';
+  document.getElementById('import-file').value='';
+  document.getElementById('btn-do-import').disabled=true;
+  importFile=null;
+}
 
+function closeImport(){
+  document.getElementById('import-modal').classList.remove('open');
+}
+
+function onFileSelect(input){
+  const f=input.files[0];
+  if(!f) return;
+  importFile=f;
+  const fname=document.getElementById('drop-fname');
+  fname.textContent='📄 '+f.name;
+  fname.style.display='block';
+  document.getElementById('btn-do-import').disabled=false;
+}
+
+// drag-and-drop
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.name.endsWith('.csv')){
+    importFile=f;
+    const fname=document.getElementById('drop-fname');
+    fname.textContent='📄 '+f.name;
+    fname.style.display='block';
+    document.getElementById('btn-do-import').disabled=false;
+  }
+});
+
+async function doImport(){
+  if(!importFile) return;
+  const btn=document.getElementById('btn-do-import');
+  const res=document.getElementById('import-result');
+  btn.disabled=true; btn.textContent='⏳ กำลังนำเข้า...';
+
+  const fd=new FormData();
+  fd.append('file', importFile);
+
+  try {
+    const r=await fetch('/api/import/csv',{method:'POST',body:fd});
+    const d=await r.json();
+    res.style.display='block';
+    if(d.success){
+      res.className='import-result ir-ok';
+      res.innerHTML=`✅ ${d.message}${d.errors&&d.errors.length?'<br><small>Errors: '+d.errors.join(', ')+'</small>':''}`;
+      await loadDashboard(); await loadTable();
+    } else {
+      res.className='import-result ir-err';
+      res.innerHTML='❌ '+d.error;
+    }
+  } catch(e){
+    res.style.display='block';
+    res.className='import-result ir-err';
+    res.innerHTML='❌ เกิดข้อผิดพลาด: '+e.message;
+  }
+
+  btn.disabled=false; btn.textContent='📤 นำเข้าข้อมูล';
+}
 
 init();
 </script>
