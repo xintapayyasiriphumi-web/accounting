@@ -629,81 +629,65 @@ function handleFileSelect(inp) {
 }
 
 function readCSV(file) {
-  if (!file.name.endsWith('.csv')) {
-    alert('กรุณาเลือกไฟล์ .csv เท่านั้น'); return;
-  }
+  if (!file.name.endsWith('.csv')) { alert('กรุณาเลือกไฟล์ .csv เท่านั้น'); return; }
   document.getElementById('imp-fname').textContent = '📄 ' + file.name;
   document.getElementById('imp-fname').style.display = 'block';
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    importFileRaw = e.target.result;
-    let text = importFileRaw.replace(/^(\uFEFF)+/, '');
+    importFileRaw = e.target.result.replace(/^(\uFEFF)+/, '');
+    const allRows = parseCSVText(importFileRaw);
+    if (allRows.length < 2) { showImpErr('ไฟล์ว่างเปล่า'); return; }
 
-    const lines = text.trim().split('\n').map(l => l.replace(/\r/,''));
-    if (!lines.length) { showImpErr('ไฟล์ว่างเปล่า'); return; }
-
-    const header = lines[0].split(',');
-
-    // detect format
-    const BACKUP_COLS  = ['วันที่','ลูกค้า','สินค้า','ราคาปกติ','ราคาจริง'];
-    const LEGACY_COLS  = ['จำนวน','ชื่อ','รายการ'];
-
-    const isBackup = BACKUP_COLS.every(h => header.some(c => c.includes(h)));
-    const isLegacy = LEGACY_COLS.every(h => header.some(c => c.includes(h)));
+    const header = allRows[0];
+    const isBackup = ['วันที่','ลูกค้า','สินค้า','ราคาปกติ'].every(k => header.some(h => h.includes(k)));
+    const isLegacy = ['รายการ','ชื่อลูกค้า'].every(k => header.some(h => h.includes(k)));
 
     if (!isBackup && !isLegacy) {
-      showImpErr(`ไม่รู้จัก format — header ที่พบ: [${header.map(h=>"'"+h+"'").join(', ')}]`); return;
+      showImpErr('ไม่รู้จัก format — header ที่พบ: ' + header.join(' | ')); return;
     }
-
     importFormat = isBackup ? 'backup' : 'legacy';
 
-    // badge
-    const fmtBadge = isBackup
-      ? '<span style="background:rgba(34,211,238,.15);color:var(--cyan);padding:2px 8px;border-radius:4px;font-size:10px">📦 Backup format</span>'
-      : '<span style="background:rgba(139,92,246,.15);color:var(--purple3);padding:2px 8px;border-radius:4px;font-size:10px">📊 Google Sheet format</span>';
+    const badge = isBackup
+      ? '<span style="background:rgba(34,211,238,.15);color:var(--cyan);padding:2px 8px;border-radius:4px;font-size:10px">Backup format</span>'
+      : '<span style="background:rgba(139,92,246,.15);color:var(--purple3);padding:2px 8px;border-radius:4px;font-size:10px">Google Sheet format</span>';
 
-    // preview
-    const previewLines = lines.slice(1, 6).filter(Boolean);
-    const previewHtml = `<table style="width:100%;border-collapse:collapse">
-      <tr>${header.slice(0,5).map(h=>`<th style="padding:5px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;font-size:10px">${h}</th>`).join('')}</tr>
-      ${previewLines.map(line => {
-        const cols = line.split(',');
-        return `<tr>${cols.slice(0,5).map(c=>`<td style="padding:4px 8px;font-size:10px;color:var(--text)">${c}</td>`).join('')}</tr>`;
-      }).join('')}
-    </table>`;
+    // preview — แสดง 5 แถว parsed ถูกต้อง
+    const previewRows = allRows.slice(1, 6);
+    const previewHtml = '<table style="width:100%;border-collapse:collapse">'
+      + '<tr>' + header.slice(0,5).map(h => `<th style="padding:5px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;font-size:10px">${h}</th>`).join('') + '</tr>'
+      + previewRows.map(row => '<tr>' + row.slice(0,5).map(c => `<td style="padding:4px 8px;font-size:10px;color:var(--text)">${c}</td>`).join('') + '</tr>').join('')
+      + '</table>';
 
     document.getElementById('imp-preview-table').innerHTML = previewHtml;
     document.getElementById('imp-preview').style.display = 'block';
 
-    // count data rows
-    const dataRows = lines.slice(1).filter(l => l.trim()).length;
-
+    const dataRows = allRows.length - 1;
     document.getElementById('imp-result').style.display = 'none';
     const btn = document.getElementById('imp-btn');
     btn.disabled = false; btn.style.opacity = '1';
-    btn.innerHTML = `📦 นำเข้าข้อมูล (${dataRows} รายการ) &nbsp;${fmtBadge}`;
-
-    // parse rows only for backup format
-    if (isBackup) {
-      const EXPECTED = ['วันที่','ลูกค้า','สินค้า','ราคาปกติ','ราคาจริง','ส่วนลด','รวมบิล','ช่องทาง','หมายเหตุ'];
-      const idx = {};
-      EXPECTED.forEach(h => idx[h] = header.findIndex(c => c.includes(h)));
-      importRows = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (!cols[idx['วันที่']] && !cols[idx['ลูกค้า']]) continue;
-        if (!cols[idx['รวมบิล']]) continue;
-        importRows.push({
-          date: cols[idx['วันที่']].trim(), customer: cols[idx['ลูกค้า']].trim(),
-          product: cols[idx['สินค้า']].trim(), actual: parseInt(cols[idx['ราคาจริง']]) || 0,
-          total: parseInt(cols[idx['รวมบิล']]) || 0,
-          method: cols[idx['ช่องทาง']].trim() || 'bank', note: cols[idx['หมายเหตุ']].trim() || '',
-        });
-      }
-    }
+    btn.innerHTML = `📦 นำเข้าข้อมูล (${dataRows} รายการ) &nbsp;${badge}`;
   };
   reader.readAsText(file, 'utf-8');
+}
+
+function parseCSVText(text) {
+  const rows = [];
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
 }
 
 function showImpErr(msg) {
