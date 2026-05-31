@@ -163,15 +163,52 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>
   <div class="nav-right">
-    <input type="month" id="monthPick" class="month-pick" title="กรองตามเดือน"/>
+    <select id="monthPick" class="month-pick" title="กรองตามเดือน" style="padding:7px 12px">
+    <option value="">ทุกเดือน</option>
+  </select>
     <button class="btn-export" onclick="exportCSV()">📥 Export CSV</button>
     <button class="btn-export" onclick="openImport()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--gold)">📦 Import CSV</button>
     <span id="nav-username" style="font-size:11px;color:var(--muted);padding:7px 12px;background:var(--s2);border:1px solid var(--border);border-radius:100px">👤 —</span>
+    <button onclick="openWH()" style="padding:7px 14px;background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.25);border-radius:100px;color:#7289da;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit" title="Discord Webhook Settings">🔔</button>
     <button onclick="doLogout()" style="padding:7px 14px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.25);border-radius:100px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">🚪 ออก</button>
   </div>
 </nav>
 
 
+
+<!-- Webhook Settings Modal -->
+<div id="wh-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#12121e;border:1px solid var(--border);border-radius:20px;padding:28px;max-width:440px;width:92%">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700">🔔 Discord Webhook</div>
+      <button onclick="closeWH()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px">×</button>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+      แจ้งเตือน Discord ทุกครั้งที่บันทึกบิลใหม่<br/>
+      ตั้งค่า <code style="background:var(--s2);padding:1px 6px;border-radius:4px">DISCORD_WEBHOOK_URL</code> ใน Railway Variables
+    </div>
+
+    <div style="background:var(--s2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:11px;line-height:1.8">
+      <div style="font-weight:600;color:var(--text);margin-bottom:6px">วิธีสร้าง Webhook URL:</div>
+      <div style="color:var(--muted)">1. เปิด Discord Server → ช่องที่ต้องการ</div>
+      <div style="color:var(--muted)">2. กด Edit Channel → Integrations → Webhooks</div>
+      <div style="color:var(--muted)">3. New Webhook → Copy Webhook URL</div>
+      <div style="color:var(--muted)">4. วางใน Railway: <code style="background:#07070e;padding:1px 6px;border-radius:3px">DISCORD_WEBHOOK_URL</code></div>
+    </div>
+
+    <div class="field">
+      <label>ทดสอบ Webhook URL</label>
+      <input type="text" id="wh-test-url" placeholder="https://discord.com/api/webhooks/..." style="font-size:11px"/>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="closeWH()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">ปิด</button>
+      <button onclick="testWebhook()" style="flex:1;padding:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#5865f2,#4752c4);color:#fff;font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700">🧪 ทดสอบส่ง</button>
+    </div>
+    <div id="wh-result" style="margin-top:10px;padding:9px 12px;border-radius:8px;font-size:12px;display:none"></div>
+  </div>
+</div>
 
 <div class="stats-row">
   <div class="stat g"><span class="stat-icon">💵</span>
@@ -353,9 +390,21 @@ async function init(){
   const r=await fetch('/api/products'); products=await r.json();
   renderProdGrid();
   const m=document.getElementById('monthPick');
+  // populate month options จาก 2025-01 ถึงเดือนปัจจุบัน
   const now=new Date();
-  m.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  filterMonth=m.value;
+  for(let y=now.getFullYear();y>=2025;y--){
+    const maxM = y===now.getFullYear() ? now.getMonth()+1 : 12;
+    const minM = 1;
+    for(let mo=maxM;mo>=minM;mo--){
+      const val=`${y}-${String(mo).padStart(2,'0')}`;
+      const label=new Date(y,mo-1,1).toLocaleDateString('th-TH',{month:'long',year:'numeric'});
+      const opt=document.createElement('option');
+      opt.value=val; opt.textContent=label;
+      m.appendChild(opt);
+    }
+  }
+  filterMonth=''; // default = ทั้งหมด
+  m.value='';
   m.addEventListener('change',()=>{filterMonth=m.value;currentPage=1;loadTable();});
   await loadDashboard(); await loadTable();
 }
@@ -591,6 +640,38 @@ function renderDonutChart(prods){
 function exportCSV(){
   const m=document.getElementById('monthPick').value;
   window.location.href='/api/export/csv'+(m?'?month='+m:'');
+}
+
+
+function openWH(){ document.getElementById('wh-modal').style.display='flex'; }
+function closeWH(){ document.getElementById('wh-modal').style.display='none'; }
+
+async function testWebhook(){
+  const url = document.getElementById('wh-test-url').value.trim();
+  const res = document.getElementById('wh-result');
+  if(!url){
+    res.style.cssText='display:block;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--red);padding:9px 12px;border-radius:8px;font-size:12px';
+    res.textContent='❌ กรุณาใส่ Webhook URL'; return;
+  }
+  res.style.cssText='display:block;background:var(--s2);border:1px solid var(--border);color:var(--muted);padding:9px 12px;border-radius:8px;font-size:12px';
+  res.textContent='⏳ กำลังส่ง...';
+  try {
+    const r = await fetch('/api/webhook/test',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({url})
+    });
+    const d = await r.json();
+    if(d.success){
+      res.style.cssText='display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);padding:9px 12px;border-radius:8px;font-size:12px';
+      res.textContent='✅ ส่งสำเร็จ! ตรวจสอบใน Discord ได้เลย';
+    } else {
+      res.style.cssText='display:block;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--red);padding:9px 12px;border-radius:8px;font-size:12px';
+      res.textContent='❌ ' + (d.error||'ส่งไม่ได้');
+    }
+  } catch(e){
+    res.style.cssText='display:block;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--red);padding:9px 12px;border-radius:8px;font-size:12px';
+    res.textContent='❌ เชื่อมต่อไม่ได้';
+  }
 }
 
 async function doLogout(){

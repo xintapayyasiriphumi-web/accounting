@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime, timezone, timedelta
 import csv, io, os, secrets
+import urllib.request, urllib.error, json as _json
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
@@ -22,7 +23,8 @@ BKK = timezone(timedelta(hours=7))
 # ตั้งใน Railway:  ADMIN_USERNAME  (default: admin)
 #                  ADMIN_PASSWORD  (required ถ้าไม่ตั้ง login ไม่ได้)
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip().lower()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
+ADMIN_PASSWORD      = os.environ.get("ADMIN_PASSWORD", "").strip()
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
 
 # ── Models ─────────────────────────────────────────────────────────
 class Order(db.Model):
@@ -80,6 +82,49 @@ PRODUCTS = [
     {"key":"Reshade",          "name":"Reshade",            "price":39},
 ]
 PROD_MAP = {p["key"]: p for p in PRODUCTS}
+
+
+# ── Discord Webhook helper ─────────────────────────────────────────
+def send_order_webhook(order):
+    if not DISCORD_WEBHOOK_URL:
+        return
+    try:
+        method_emoji = {"bank": "🏦", "truemoney": "💚", "other": "📦"}.get(order.method, "💳")
+        items_text   = "\n".join(
+            f"• {i.product_name} — **{i.actual_price:,} ฿**"
+            + (f" ~~{i.list_price:,}~~ " if i.list_price != i.actual_price else "")
+            for i in order.items
+        )
+        discount = order.total_list - order.total_actual
+        now_str  = datetime.now(BKK).strftime("%d/%m/%Y %H:%M")
+
+        embed = {
+            "title": f"🛒  ออเดอร์ใหม่ #{order.id}",
+            "color": 0x8b5cf6,
+            "fields": [
+                {"name": "👤 ลูกค้า",        "value": f"@{order.customer}",         "inline": True},
+                {"name": f"{method_emoji} ช่องทาง", "value": order.method,          "inline": True},
+                {"name": "📦 สินค้า",         "value": items_text or "—",           "inline": False},
+                {"name": "💰 รวมจ่าย",        "value": f"**{order.total_actual:,} ฿**"
+                    + (f"  (ลด {discount:,} ฿)" if discount > 0 else ""), "inline": True},
+                {"name": "🕐 เวลา",           "value": now_str,                     "inline": True},
+            ],
+            "footer": {"text": "INSIDEX Accounting"},
+            "timestamp": datetime.now(BKK).isoformat(),
+        }
+        if order.note:
+            embed["fields"].append({"name": "📝 หมายเหตุ", "value": order.note, "inline": False})
+
+        payload = _json.dumps({"embeds": [embed]}).encode("utf-8")
+        req = urllib.request.Request(
+            DISCORD_WEBHOOK_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"[WEBHOOK] failed: {e}")
 
 # ── Auth helpers ────────────────────────────────────────────────────
 def login_required(f):
@@ -210,6 +255,7 @@ def api_create():
         ))
 
     db.session.commit()
+    send_order_webhook(order)
     return jsonify({"success": True, "id": order.id, "total": order.total_actual})
 
 # ── API: Delete order ──────────────────────────────────────────────
@@ -461,6 +507,34 @@ def api_import_order():
     ))
     db.session.commit()
     return jsonify({"success": True, "id": order.id})
+
+
+# ── API: Test webhook ──────────────────────────────────────────────
+@app.route("/api/webhook/test", methods=["POST"])
+@login_required
+def api_webhook_test():
+    d   = request.json or {}
+    url = (d.get("url") or "").strip()
+    if not url:
+        return jsonify({"success": False, "error": "ไม่มี URL"})
+    try:
+        embed = {
+            "title": "🧪  ทดสอบ INSIDEX Webhook",
+            "description": "Webhook เชื่อมต่อสำเร็จ! จะแจ้งเตือนทุกครั้งที่มีออเดอร์ใหม่",
+            "color": 0x10b981,
+            "footer": {"text": "INSIDEX Accounting"},
+            "timestamp": datetime.now(BKK).isoformat(),
+        }
+        payload = _json.dumps({"embeds": [embed]}).encode("utf-8")
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 # ── API: Backup CSV (for Discord Bot) ─────────────────────────────
 # ใช้ BACKUP_SECRET header แทน session เพราะ bot เรียกจาก server อื่น
