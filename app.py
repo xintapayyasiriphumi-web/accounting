@@ -18,6 +18,9 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 db  = SQLAlchemy(app)
 BKK = timezone(timedelta(hours=7))
 
+# ── Admin credentials from env ─────────────────────────────────────
+# ตั้งใน Railway:  ADMIN_USERNAME  (default: admin)
+#                  ADMIN_PASSWORD  (required ถ้าไม่ตั้ง login ไม่ได้)
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip().lower()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
 
@@ -45,6 +48,7 @@ class OrderItem(db.Model):
     list_price   = db.Column(db.Integer, nullable=False)
     actual_price = db.Column(db.Integer, nullable=False)
 
+# backward-compat
 class Transaction(db.Model):
     __tablename__ = "transactions"
     id           = db.Column(db.Integer, primary_key=True)
@@ -128,11 +132,14 @@ def login_page():
 def api_login():
     if not ADMIN_PASSWORD:
         return jsonify({"success": False, "error": "ยังไม่ได้ตั้ง ADMIN_PASSWORD ใน Railway"}), 500
+
     d        = request.json or {}
     username = (d.get("username") or "").strip().lower()
     password = d.get("password") or ""
+
     if username != ADMIN_USERNAME or password != ADMIN_PASSWORD:
         return jsonify({"success": False, "error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"}), 401
+
     session.permanent  = True
     session["logged_in"] = True
     session["username"]  = ADMIN_USERNAME
@@ -163,6 +170,7 @@ def api_list():
     limit = int(request.args.get("limit", 15))
     q     = request.args.get("q", "").strip()
     month = request.args.get("month", "")
+
     query = Order.query.order_by(Order.created_at.desc())
     if q:
         query = query.filter(db.or_(
@@ -176,6 +184,7 @@ def api_list():
             db.extract("year",  Order.created_at) == int(y),
             db.extract("month", Order.created_at) == int(m),
         )
+
     total = query.count()
     items = query.offset((page-1)*limit).limit(limit).all()
     return jsonify({"total": total, "page": page, "items": [order_to_dict(o) for o in items]})
@@ -187,12 +196,15 @@ def api_create():
     d        = request.json or {}
     customer = (d.get("customer") or "").strip()
     cart     = d.get("items", [])
+
     if not customer:
         return jsonify({"success": False, "error": "กรุณาใส่ชื่อลูกค้า"}), 400
     if not cart:
         return jsonify({"success": False, "error": "กรุณาเลือกสินค้าอย่างน้อย 1 รายการ"}), 400
+
     order = Order(customer=customer, method=d.get("method","bank"), note=(d.get("note") or "").strip())
     db.session.add(order)
+
     for ci in cart:
         prod = PROD_MAP.get(ci.get("product_key"))
         if not prod:
@@ -205,6 +217,7 @@ def api_create():
             list_price   = prod["price"],
             actual_price = int(ci.get("actual_price", prod["price"])),
         ))
+
     db.session.commit()
     return jsonify({"success": True, "id": order.id, "total": order.total_actual})
 
@@ -303,7 +316,58 @@ def api_export():
         download_name=f"insidex_{month or 'all'}.csv",
     )
 
-# ── API: Backup CSV (for scheduler / Discord Bot) ─────────────────
+
+
+# ── API: Import order from CSV backup ─────────────────────────────
+@app.route("/api/import/order", methods=["POST"])
+@login_required
+def api_import_order():
+    d        = request.json or {}
+    customer = (d.get("customer") or "").strip()
+    product  = (d.get("product")  or "").strip()
+    date_str = (d.get("date")     or "").strip()   # "YYYY-MM-DD HH:MM"
+    actual   = int(d.get("actual", 0))
+    method   = d.get("method", "bank")
+    note     = (d.get("note") or "").strip()
+
+    if not customer or not date_str:
+        return jsonify({"success": False, "error": "ข้อมูลไม่ครบ"})
+
+    # parse datetime
+    try:
+        dt = datetime.strptime(date_str[:16], "%Y-%m-%d %H:%M").replace(tzinfo=BKK)
+    except ValueError:
+        return jsonify({"success": False, "error": f"รูปแบบวันที่ผิด: {date_str}"})
+
+    # dedup check — same customer + same minute
+    exists = Order.query.filter(
+        Order.customer == customer,
+        Order.created_at >= dt.replace(second=0, microsecond=0),
+        Order.created_at <  dt.replace(second=59, microsecond=999999),
+    ).first()
+    if exists:
+        return jsonify({"success": False, "skipped": True, "reason": "ซ้ำ"})
+
+    # find or create product key
+    prod = next((p for p in PRODUCTS if p["name"] == product or p["key"] == product), None)
+    if not prod:
+        # ใช้ custom product
+        prod = {"key": "CUSTOM", "name": product, "price": actual}
+
+    order = Order(customer=customer, method=method, note=note, created_at=dt)
+    db.session.add(order)
+    db.session.add(OrderItem(
+        order        = order,
+        product_key  = prod["key"],
+        product_name = prod["name"],
+        list_price   = prod["price"],
+        actual_price = actual,
+    ))
+    db.session.commit()
+    return jsonify({"success": True, "id": order.id})
+
+# ── API: Backup CSV (for Discord Bot) ─────────────────────────────
+# ใช้ BACKUP_SECRET header แทน session เพราะ bot เรียกจาก server อื่น
 BACKUP_SECRET = os.environ.get("BACKUP_SECRET", "")
 
 @app.route("/api/backup/csv")
@@ -341,6 +405,7 @@ def api_backup():
                 o.note   if idx==0 else "",
             ])
 
+    # summary row
     w.writerow([])
     w.writerow(["รวมเดือน", "", "", "", "", "", total_rev, "", f"{len(orders)} บิล"])
 
@@ -352,135 +417,6 @@ def api_backup():
         mimetype="text/csv", as_attachment=True,
         download_name=fname,
     )
-
-# ── API: Import / Restore from CSV ────────────────────────────────
-@app.route("/api/import/csv", methods=["POST"])
-@login_required
-def api_import():
-    """
-    รับไฟล์ CSV (จาก backup) แล้ว import กลับเข้า DB
-    - ข้ามแถวที่ข้อมูลซ้ำ (customer + created_at + product_name ตรงกัน)
-    - ส่งกลับ: inserted, skipped, errors
-    """
-    f = request.files.get("file")
-    if not f:
-        return jsonify({"success": False, "error": "ไม่พบไฟล์"}), 400
-
-    raw   = f.read()
-    # strip BOM
-    text  = raw.decode("utf-8-sig").strip()
-    lines = list(csv.reader(io.StringIO(text)))
-
-    if not lines:
-        return jsonify({"success": False, "error": "ไฟล์ว่างเปล่า"}), 400
-
-    header = [h.strip() for h in lines[0]]
-    # header ที่คาดหวัง: วันที่, ลูกค้า, สินค้า, ราคาปกติ, ราคาจริง, ส่วนลด, รวมบิล, ช่องทาง, หมายเหตุ
-    expected = ["วันที่","ลูกค้า","สินค้า","ราคาปกติ","ราคาจริง","ส่วนลด","รวมบิล","ช่องทาง","หมายเหตุ"]
-    if header != expected:
-        return jsonify({"success": False, "error": f"header ไม่ตรง — ต้องเป็น: {expected}"}), 400
-
-    inserted = 0
-    skipped  = 0
-    errors   = []
-
-    # จัดกลุ่ม rows เป็น orders (rows ที่มีวันที่ = order แรก, rows ที่ไม่มีวันที่ = items ต่อเนื่อง)
-    # รูปแบบ CSV: แถวแรกของแต่ละ order มีค่าวันที่/ลูกค้า/รวมบิล/ช่องทาง/หมายเหตุ
-    #             แถวต่อมาในออเดอร์เดียวกันช่อง วันที่/ลูกค้า จะว่าง
-
-    pending_order  = None   # dict สำหรับ order ปัจจุบัน
-    pending_items  = []     # list of item dicts
-
-    def flush_order():
-        nonlocal inserted, skipped
-        if not pending_order or not pending_items:
-            return
-        o_dt       = pending_order["created_at"]
-        o_customer = pending_order["customer"]
-        o_method   = pending_order["method"]
-        o_note     = pending_order["note"]
-
-        # ตรวจซ้ำ: หาก order ที่ created_at + customer + จำนวน items เหมือนกันมีอยู่แล้ว → skip
-        existing = Order.query.filter_by(customer=o_customer).filter(
-            Order.created_at == o_dt
-        ).first()
-        if existing:
-            skipped += 1
-            return
-
-        order = Order(
-            created_at = o_dt,
-            customer   = o_customer,
-            method     = o_method,
-            note       = o_note,
-        )
-        db.session.add(order)
-
-        for it in pending_items:
-            # หา list_price จาก PROD_MAP (ถ้าหาไม่เจอใช้ค่าใน CSV)
-            prod      = next((p for p in PRODUCTS if p["name"] == it["product_name"]), None)
-            list_p    = prod["price"] if prod else it["list_price"]
-            prod_key  = prod["key"]   if prod else it["product_name"]
-            db.session.add(OrderItem(
-                order        = order,
-                product_key  = prod_key,
-                product_name = it["product_name"],
-                list_price   = list_p,
-                actual_price = it["actual_price"],
-            ))
-
-        db.session.commit()
-        inserted += 1
-
-    for row_num, row in enumerate(lines[1:], start=2):
-        if len(row) < 9:
-            continue
-        date_str, customer, product_name, list_price_str, actual_price_str, _, total_str, method, note = \
-            [c.strip() for c in row[:9]]
-
-        # แถว summary (รวมเดือน) — ข้าม
-        if date_str == "รวมเดือน":
-            continue
-
-        try:
-            list_price   = int(list_price_str)   if list_price_str   else 0
-            actual_price = int(actual_price_str) if actual_price_str else 0
-        except ValueError:
-            errors.append(f"แถว {row_num}: parse ราคาไม่ได้")
-            continue
-
-        if date_str:
-            # order ใหม่ — flush ของเก่าก่อน
-            flush_order()
-            pending_order = {}
-            pending_items = []
-            try:
-                pending_order["created_at"] = datetime.strptime(date_str, "%Y-%m-%d %H:%M").replace(tzinfo=BKK)
-            except ValueError:
-                errors.append(f"แถว {row_num}: format วันที่ไม่ถูกต้อง '{date_str}'")
-                pending_order = None
-                continue
-            pending_order["customer"] = customer
-            pending_order["method"]   = method or "bank"
-            pending_order["note"]     = note
-
-        if pending_order is not None and product_name:
-            pending_items.append({
-                "product_name": product_name,
-                "list_price":   list_price,
-                "actual_price": actual_price,
-            })
-
-    # flush อันสุดท้าย
-    flush_order()
-
-    return jsonify({
-        "success":  True,
-        "inserted": inserted,
-        "skipped":  skipped,
-        "errors":   errors,
-        "message":  f"นำเข้าสำเร็จ {inserted} บิล, ข้าม {skipped} บิล (ซ้ำ){', มีข้อผิดพลาด '+str(len(errors))+' แถว' if errors else ''}",
-    })
 
 @app.route("/")
 @login_required
