@@ -360,8 +360,10 @@ function renderCart(){
     <div class="cart-item">
       <div class="cart-item-name">${c.name}</div>
       <span class="cart-item-list">${c.listPrice.toLocaleString()}</span>
-      <input class="cart-price-inp" type="number" value="${c.actualPrice}" min="0"
-        oninput="updateCartPrice(${i},this.value)" title="แก้ราคา"/>
+      <input class="cart-price-inp" type="text" inputmode="numeric" id="cpi-${i}"
+        value="${c.actualPrice}"
+        onchange="updateCartPrice(${i},this.value)"
+        onfocus="this.select()" title="แก้ราคา"/>
       <button class="cart-remove" onclick="removeCartItem(${i})">×</button>
     </div>`).join('');
 
@@ -375,7 +377,18 @@ function renderCart(){
 
 function updateCartPrice(idx,val){
   cart[idx].actualPrice=parseInt(val)||0;
-  renderCart();
+  updateCartTotals();
+}
+
+function updateCartTotals(){
+  if(!cart.length) return;
+  const totalList  =cart.reduce((s,c)=>s+c.listPrice,0);
+  const totalActual=cart.reduce((s,c)=>s+c.actualPrice,0);
+  const disc=totalList-totalActual;
+  const tv=document.getElementById('cart-total-val');
+  const dl=document.getElementById('cart-disc-label');
+  if(tv) tv.textContent=totalActual.toLocaleString()+' ฿';
+  if(dl) dl.textContent=disc>0?`ลด ${disc.toLocaleString()} ฿`:'';
 }
 
 function removeCartItem(idx){
