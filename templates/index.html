@@ -727,10 +727,12 @@ async function doImport() {
 
   if (importFormat === 'legacy') {
     // ส่งทั้งไฟล์ไปให้ backend parse
+    const blob = new Blob([importFileRaw], {type:'text/csv;charset=utf-8'});
+    const fd = new FormData();
+    fd.append('file', blob, 'import.csv');
     const r = await fetch('/api/import/legacy_csv', {
       method: 'POST',
-      headers: {'Content-Type':'text/plain; charset=utf-8'},
-      body: importFileRaw,
+      body: fd,
     });
     const d = await r.json();
     res.style.display = 'block';

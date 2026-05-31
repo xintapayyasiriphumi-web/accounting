@@ -317,13 +317,18 @@ def api_export():
 def api_import_legacy():
     import csv as csvlib, io as io2
 
-    raw   = request.data.decode("utf-8-sig").lstrip("\ufeff")
-    lines = raw.splitlines()
-    if not lines:
+    # รับทั้ง raw body และ multipart form
+    if request.files.get("file"):
+        raw = request.files["file"].read().decode("utf-8-sig")
+    else:
+        raw = request.get_data(as_text=False).decode("utf-8-sig")
+
+    # strip BOM ทุกชั้น
+    raw = raw.lstrip("\ufeff")
+    if not raw.strip():
         return jsonify({"success": False, "error": "ไฟล์ว่าง"})
 
-    reader = csvlib.DictReader(lines)
-    # normalize header keys
+    reader = csvlib.DictReader(io2.StringIO(raw))
     rows = list(reader)
 
     # detect header
