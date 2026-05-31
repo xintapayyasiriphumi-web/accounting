@@ -68,18 +68,27 @@ with app.app_context():
 
 # ── Products ───────────────────────────────────────────────────────
 PRODUCTS = [
-    {"key":"SupportX",         "name":"SupportX",          "price":4999},
-    {"key":"Custom Setting",   "name":"Custom Setting",     "price":1000},
-    {"key":"Max Pack",         "name":"Max Pack",           "price":799},
-    {"key":"Performance Pack", "name":"Performance Pack",   "price":649},
-    {"key":"Pro Pack",         "name":"Pro Pack",           "price":629},
-    {"key":"GOATX",            "name":"🐐 G.O.A.T.X",       "price":429},
-    {"key":"ULTIMATEXPLUS",    "name":"💎 ULTIMATEXPLUS",    "price":259},
-    {"key":"ULTIMATEXXPLUS",   "name":"💎 ULTIMATEX+PLUS",   "price":629},
-    {"key":"ULTIMATEX",        "name":"🔥 ULTIMATEX",        "price":399},
-    {"key":"SHXV2",            "name":"🚀 Shx V.2",          "price":309},
-    {"key":"SHXV1",            "name":"⚡ Shx V.1",          "price":159},
-    {"key":"Reshade",          "name":"Reshade",            "price":39},
+    {"key":"SupportX",         "name":"👑 SupportX",             "price":4999},
+    {"key":"Custom Setting",   "name":"🛠️ Custom Setting",       "price":1000},
+
+    {"key":"Max Pack",         "name":"💎 Max Pack",             "price":799},
+    {"key":"Performance Pack", "name":"🚀 Performance Pack",     "price":649},
+    {"key":"Pro Pack",         "name":"⚡ Pro Pack",             "price":629},
+
+    {"key":"GOATX",            "name":"🐐 G.O.A.T.X",           "price":429},
+    {"key":"ULTIMATEXPLUS",    "name":"💠 ULTIMATEXPLUS",        "price":259},
+    {"key":"ULTIMATEXXPLUS",   "name":"💎 ULTIMATEX+PLUS",       "price":629},
+    {"key":"ULTIMATEX",        "name":"🔥 ULTIMATEX",            "price":399},
+
+    {"key":"SHXV2",            "name":"🚀 SHX V.2",             "price":309},
+    {"key":"SHXV1",            "name":"⚡ SHX V.1",             "price":159},
+    {"key":"Dota V1",          "name":"🎮 Dota V.1",            "price":159},
+
+    {"key":"Windows OS",       "name":"🖥️ Windows OS",          "price":250},
+    {"key":"Windows Addon",    "name":"🔧 Windows Addon",        "price":150},
+    {"key":"Windows 10/11",    "name":"💻 Windows 10/11",        "price":99},
+
+    {"key":"Reshade",          "name":"🎨 Reshade",             "price":39},
 ]
 PROD_MAP = {p["key"]: p for p in PRODUCTS}
 
