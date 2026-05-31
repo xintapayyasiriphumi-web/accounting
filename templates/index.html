@@ -812,26 +812,24 @@ async function doImport() {
       res.innerHTML = '❌ ' + (d.error || 'เกิดข้อผิดพลาด');
     }
   } else {
-    // backup format — row by row
+    // backup format — bulk ส่งครั้งเดียว
     if (!importRows.length) return;
-    let imported = 0, skipped = 0, failed = 0;
-    for (const row of importRows) {
-      try {
-        const r = await fetch('/api/import/order', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(row),
-        });
-        const d = await r.json();
-        if (d.success) imported++; else if (d.skipped) skipped++; else failed++;
-      } catch { failed++; }
-    }
+    const r = await fetch('/api/import/bulk', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(importRows),
+    });
+    const d = await r.json();
     res.style.display = 'block';
-    const ok = failed === 0;
+    const ok = d.success && d.failed === 0;
     res.style.background = ok ? 'rgba(16,185,129,.1)' : 'rgba(245,158,11,.08)';
     res.style.border      = ok ? '1px solid rgba(16,185,129,.3)' : '1px solid rgba(245,158,11,.25)';
     res.style.color        = ok ? 'var(--green)' : '#fcd34d';
-    res.innerHTML = `✅ นำเข้าสำเร็จ <strong>${imported}</strong> บิล &nbsp;|&nbsp; ข้ามซ้ำ ${skipped} &nbsp;|&nbsp; ผิดพลาด ${failed}`;
-    if (imported > 0) { await loadDashboard(); await loadTable(); }
+    if(d.success) {
+      res.innerHTML = `✅ นำเข้าสำเร็จ <strong>${d.imported}</strong> บิล &nbsp;|&nbsp; ข้ามซ้ำ ${d.skipped} &nbsp;|&nbsp; ผิดพลาด ${d.failed}`;
+      if (d.imported > 0) { await loadDashboard(); await loadTable(); }
+    } else {
+      res.innerHTML = '❌ ' + (d.error || 'เกิดข้อผิดพลาด');
+    }
   }
   btn.textContent = '✅ เสร็จสิ้น';
 }

@@ -460,6 +460,61 @@ def api_import_legacy():
 
     return jsonify({"success": True, "imported": imported, "skipped": skipped, "failed": failed})
 
+
+# ── API: Bulk import backup CSV (ส่งครั้งเดียวทั้งหมด) ─────────────
+@app.route("/api/import/bulk", methods=["POST"])
+@login_required
+def api_import_bulk():
+    items   = request.json or []
+    if not items:
+        return jsonify({"success": False, "error": "ไม่มีข้อมูล"})
+
+    imported = skipped = failed = 0
+    for d in items:
+        try:
+            customer = (d.get("customer") or "").strip()
+            product  = (d.get("product")  or "").strip()
+            date_str = (d.get("date")     or "").strip()
+            actual   = int(d.get("actual", 0))
+            method   = d.get("method", "bank")
+            note     = (d.get("note") or "").strip()
+
+            if not customer or not date_str:
+                failed += 1; continue
+
+            try:
+                dt = datetime.strptime(date_str[:16], "%Y-%m-%d %H:%M").replace(tzinfo=BKK)
+            except ValueError:
+                failed += 1; continue
+
+            # dedup
+            exists = Order.query.filter(
+                Order.customer == customer,
+                Order.created_at >= dt.replace(second=0,  microsecond=0),
+                Order.created_at <  dt.replace(second=59, microsecond=999999),
+            ).first()
+            if exists:
+                skipped += 1; continue
+
+            prod = next((p for p in PRODUCTS if p["name"] == product or p["key"] == product),
+                        {"key": "CUSTOM", "name": product, "price": actual})
+
+            order = Order(customer=customer, method=method, note=note, created_at=dt)
+            db.session.add(order)
+            db.session.add(OrderItem(
+                order=order, product_key=prod["key"], product_name=prod["name"],
+                list_price=prod["price"], actual_price=actual,
+            ))
+            imported += 1
+        except Exception:
+            db.session.rollback()
+            failed += 1
+
+    if imported > 0:
+        db.session.commit()
+
+    return jsonify({"success": True, "imported": imported, "skipped": skipped, "failed": failed})
+
 # ── API: Import order from CSV backup ─────────────────────────────
 @app.route("/api/import/order", methods=["POST"])
 @login_required
