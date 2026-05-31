@@ -743,7 +743,48 @@ function readCSV(file) {
     document.getElementById('imp-preview-table').innerHTML = previewHtml;
     document.getElementById('imp-preview').style.display = 'block';
 
-    const dataRows = allRows.length - 1;
+    // ── Parse backup format rows ──
+    if (isBackup) {
+      const hi = {}; // header index map
+      header.forEach((h,i) => hi[h] = i);
+      const findH = (...keys) => header.find(h => keys.some(k => h.includes(k)));
+      const hDate   = findH('วันที่');
+      const hCust   = findH('ลูกค้า');
+      const hProd   = findH('สินค้า');
+      const hActual = findH('ราคาจริง');
+      const hTotal  = findH('รวมบิล');
+      const hMethod = findH('ช่องทาง');
+      const hNote   = findH('หมายเหตุ');
+
+      importRows = [];
+      let lastDate='', lastCust='', lastMethod='', lastNote='';
+      for (let i = 1; i < allRows.length; i++) {
+        const row = allRows[i];
+        const date   = row[header.indexOf(hDate)]   || '';
+        const cust   = row[header.indexOf(hCust)]   || '';
+        const prod   = row[header.indexOf(hProd)]   || '';
+        const actual = parseInt(row[header.indexOf(hActual)]) || 0;
+        const total  = parseInt(row[header.indexOf(hTotal)])  || 0;
+        const method = row[header.indexOf(hMethod)] || '';
+        const note   = row[header.indexOf(hNote)]   || '';
+
+        if (date) { lastDate=date; lastCust=cust; lastMethod=method; lastNote=note; }
+        // แถว item ของบิลเดียวกัน วันที่จะว่าง แต่สินค้าจะมี
+        const useDate   = date   || lastDate;
+        const useCust   = cust   || lastCust;
+        const useMethod = method || lastMethod;
+        const useNote   = note   || lastNote;
+
+        if (!useDate || !useCust || !prod) continue;
+        // บิล 1 สินค้า = total มีค่า, บิลหลายสินค้า item rows = total ว่าง
+        importRows.push({
+          date: useDate, customer: useCust, product: prod,
+          actual: actual, method: useMethod, note: useNote,
+        });
+      }
+    }
+
+    const dataRows = importRows.length || (allRows.length - 1);
     document.getElementById('imp-result').style.display = 'none';
     const btn = document.getElementById('imp-btn');
     btn.disabled = false; btn.style.opacity = '1';
