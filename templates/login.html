@@ -6,94 +6,57 @@
 <title>INSIDEX — Login</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
-:root{
-  --bg:#06060a;--s1:#0e0e18;--s2:#13131f;--border:#1e1e35;
-  --text:#e8e8f0;--muted:#6a6a8a;
-  --purple:#8b5cf6;--purple3:#a78bfa;--cyan:#22d3ee;
-  --green:#10b981;--red:#f43f5e;
-}
+:root{--bg:#06060a;--s1:#0e0e18;--border:#1e1e35;--text:#e8e8f0;--muted:#6a6a8a;--purple:#8b5cf6;--purple3:#a78bfa;--cyan:#22d3ee;--red:#f43f5e;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;
-  min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
-
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;
-  background:
-    radial-gradient(ellipse 60% 60% at 20% 20%,rgba(139,92,246,.09),transparent),
+  background:radial-gradient(ellipse 60% 60% at 20% 20%,rgba(139,92,246,.09),transparent),
     radial-gradient(ellipse 50% 50% at 80% 80%,rgba(34,211,238,.05),transparent),
     linear-gradient(rgba(139,92,246,.012) 1px,transparent 1px),
     linear-gradient(90deg,rgba(139,92,246,.012) 1px,transparent 1px);
   background-size:auto,auto,44px 44px,44px 44px}
-
-.card{position:relative;z-index:1;width:100%;max-width:400px;padding:0 20px;
-  animation:fadeUp .4s ease both}
-
+.wrap{position:relative;z-index:1;width:100%;max-width:400px;padding:0 20px;animation:fadeUp .4s ease both}
 .logo-wrap{text-align:center;margin-bottom:32px}
 .logo-icon{width:60px;height:60px;background:linear-gradient(135deg,var(--purple),var(--cyan));
   border-radius:16px;display:inline-flex;align-items:center;justify-content:center;
-  font-size:26px;margin-bottom:14px;box-shadow:0 0 40px rgba(139,92,246,.3)}
-.logo-name{font-family:'Syne',sans-serif;font-weight:900;font-size:22px;letter-spacing:.08em;
+  font-size:26px;margin-bottom:14px}
+.logo-name{font-family:'Syne',sans-serif;font-weight:900;font-size:22px;
   background:linear-gradient(135deg,var(--purple3),var(--cyan));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.logo-sub{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.06em}
-
-.form-card{background:var(--s1);border:1px solid var(--border);border-radius:20px;
-  padding:32px;backdrop-filter:blur(12px)}
-
+.logo-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.card{background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:32px}
 .field{margin-bottom:18px}
-.field label{display:block;font-size:9px;letter-spacing:.14em;color:var(--muted);
-  text-transform:uppercase;font-weight:600;margin-bottom:7px}
+.field label{display:block;font-size:9px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:7px}
 .field input{width:100%;background:#07070e;border:1.5px solid var(--border);border-radius:10px;
-  padding:12px 14px;color:var(--text);font-family:'JetBrains Mono',monospace;
-  font-size:13px;outline:none;transition:.2s}
+  padding:12px 14px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:.2s}
 .field input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,.12)}
 .field input::placeholder{color:var(--muted)}
-
-.btn-login{width:100%;padding:13px;border:none;border-radius:10px;
-  background:linear-gradient(135deg,var(--purple),var(--purple2,#6d28d9));
-  color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
-  cursor:pointer;transition:.2s;margin-top:4px;letter-spacing:.04em}
-.btn-login:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 6px 20px rgba(139,92,246,.35)}
-.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none}
-
-.err-box{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);
-  border-radius:8px;padding:10px 14px;font-size:12px;color:var(--red);
-  margin-top:14px;display:none;animation:fadeIn .2s}
-
-.setup-link{text-align:center;margin-top:20px;font-size:11px;color:var(--muted)}
-.setup-link a{color:var(--cyan);text-decoration:none;cursor:pointer}
-.setup-link a:hover{text-decoration:underline}
-
-/* Setup modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
-  z-index:100;display:flex;align-items:center;justify-content:center;display:none;animation:fadeIn .2s}
-.modal-box{background:#12121e;border:1px solid var(--border);border-radius:16px;
-  padding:28px;max-width:360px;width:90%;animation:scaleIn .2s ease}
-.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px}
-.modal-sub{font-size:11px;color:var(--muted);margin-bottom:22px;line-height:1.5}
-.modal-btns{display:flex;gap:10px;margin-top:20px}
-.btn-sm{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;
-  cursor:pointer;font-family:'Syne',sans-serif;transition:.2s}
-.btn-cancel{background:none;border:1px solid var(--border);color:var(--text)}
-.btn-confirm{border:none;background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff}
-
+.btn{width:100%;padding:13px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--purple),#6d28d9);
+  color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:.2s;margin-top:4px}
+.btn:hover{opacity:.9;transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);border-radius:8px;
+  padding:10px 14px;font-size:12px;color:var(--red);margin-top:14px;display:none}
+.warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;
+  padding:10px 14px;font-size:11px;color:#fcd34d;margin-bottom:18px;display:none;line-height:1.5}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 </style>
 </head>
 <body>
-
-<div class="card">
+<div class="wrap">
   <div class="logo-wrap">
     <div class="logo-icon">💰</div>
     <div class="logo-name">INSIDEX</div>
     <div class="logo-sub">Accounting System · Admin Only</div>
   </div>
-
-  <div class="form-card">
+  <div class="card">
+    <div class="warn" id="warn-no-pw">
+      ⚠️ ยังไม่ได้ตั้ง <strong>ADMIN_PASSWORD</strong> ใน Railway<br/>
+      ไปที่ Railway → Variables → เพิ่ม ADMIN_PASSWORD แล้ว Redeploy
+    </div>
     <div class="field">
       <label>ชื่อผู้ใช้</label>
-      <input type="text" id="inp-user" placeholder="username" autocomplete="username"
+      <input type="text" id="inp-user" placeholder="admin" autocomplete="username"
         onkeydown="if(event.key==='Enter')document.getElementById('inp-pass').focus()"/>
     </div>
     <div class="field">
@@ -101,113 +64,37 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;
       <input type="password" id="inp-pass" placeholder="••••••••" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')doLogin()"/>
     </div>
-    <button class="btn-login" id="btn-login" onclick="doLogin()">🔐 เข้าสู่ระบบ</button>
-    <div class="err-box" id="err-box"></div>
-  </div>
-
-  <div class="setup-link" id="setup-link" style="display:none">
-    ยังไม่มีบัญชี? <a onclick="openSetup()">ตั้งค่า Admin ครั้งแรก</a>
+    <button class="btn" id="btn" onclick="doLogin()">🔐 เข้าสู่ระบบ</button>
+    <div class="err" id="err"></div>
   </div>
 </div>
-
-<!-- Setup Modal -->
-<div class="modal-overlay" id="setup-modal">
-  <div class="modal-box">
-    <div class="modal-title">🛠️ ตั้งค่า Admin ครั้งแรก</div>
-    <div class="modal-sub">สร้างบัญชี admin สำหรับเข้าใช้งาน ทำได้แค่ครั้งเดียว</div>
-    <div class="field">
-      <label>ชื่อผู้ใช้</label>
-      <input type="text" id="setup-user" placeholder="admin" value="admin"/>
-    </div>
-    <div class="field">
-      <label>รหัสผ่าน (อย่างน้อย 6 ตัว)</label>
-      <input type="password" id="setup-pass" placeholder="••••••••"/>
-    </div>
-    <div class="field">
-      <label>ยืนยันรหัสผ่าน</label>
-      <input type="password" id="setup-pass2" placeholder="••••••••"/>
-    </div>
-    <div class="err-box" id="setup-err"></div>
-    <div class="modal-btns">
-      <button class="btn-sm btn-cancel" onclick="closeSetup()">ยกเลิก</button>
-      <button class="btn-sm btn-confirm" onclick="doSetup()">✅ สร้างบัญชี</button>
-    </div>
-  </div>
-</div>
-
 <script>
-async function checkSetupNeeded(){
-  const r=await fetch('/api/auth/me');
-  const d=await r.json();
-  if(d.logged_in){ window.location.href='/'; return; }
-
-  // เช็คว่ามี user แล้วหรือยัง (ถ้า login fail แต่ยังไม่มี user ให้แสดง setup)
-  const r2=await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
-  const d2=await r2.json();
-  // ถ้า error ว่า "มี admin อยู่แล้ว" = ไม่ต้องแสดง setup link
-  if(d2.error && d2.error.includes('มี admin')){
-    document.getElementById('setup-link').style.display='none';
+async function init(){
+  const me=await fetch('/api/auth/me').then(r=>r.json());
+  if(me.logged_in){window.location.href='/';return;}
+  if(me.no_password){
+    document.getElementById('warn-no-pw').style.display='block';
+    document.getElementById('btn').disabled=true;
   } else {
-    // ยังไม่มี admin ให้แสดง setup
-    document.getElementById('setup-link').style.display='block';
+    document.getElementById('inp-user').focus();
   }
 }
 
 async function doLogin(){
   const user=document.getElementById('inp-user').value.trim();
   const pass=document.getElementById('inp-pass').value;
-  const btn=document.getElementById('btn-login');
-  const err=document.getElementById('err-box');
-
-  if(!user||!pass){showErr(err,'กรุณาใส่ชื่อผู้ใช้และรหัสผ่าน');return;}
-  btn.disabled=true; btn.textContent='⏳ กำลังเข้าสู่ระบบ...';
-
+  const btn=document.getElementById('btn');
+  const err=document.getElementById('err');
+  if(!user||!pass){err.textContent='กรุณาใส่ชื่อผู้ใช้และรหัสผ่าน';err.style.display='block';return;}
+  btn.disabled=true;btn.textContent='⏳ กำลังเข้าสู่ระบบ...';
   const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({username:user,password:pass})});
   const d=await r.json();
-
-  btn.disabled=false; btn.textContent='🔐 เข้าสู่ระบบ';
-  if(d.success){ window.location.href='/'; }
-  else { showErr(err,d.error||'เข้าสู่ระบบไม่ได้'); }
+  btn.disabled=false;btn.textContent='🔐 เข้าสู่ระบบ';
+  if(d.success){window.location.href='/';}
+  else{err.textContent=d.error||'เข้าสู่ระบบไม่ได้';err.style.display='block';}
 }
-
-function showErr(el,msg){el.textContent=msg;el.style.display='block';}
-function hideErr(el){el.style.display='none';}
-
-function openSetup(){document.getElementById('setup-modal').style.display='flex';}
-function closeSetup(){document.getElementById('setup-modal').style.display='none';}
-
-async function doSetup(){
-  const user=document.getElementById('setup-user').value.trim();
-  const pass=document.getElementById('setup-pass').value;
-  const pass2=document.getElementById('setup-pass2').value;
-  const err=document.getElementById('setup-err');
-  hideErr(err);
-
-  if(!user){showErr(err,'กรุณาใส่ชื่อผู้ใช้');return;}
-  if(pass.length<6){showErr(err,'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');return;}
-  if(pass!==pass2){showErr(err,'รหัสผ่านไม่ตรงกัน');return;}
-
-  const r=await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({username:user,password:pass})});
-  const d=await r.json();
-
-  if(d.success){
-    closeSetup();
-    document.getElementById('inp-user').value=user;
-    document.getElementById('err-box').style.display='none';
-    document.getElementById('setup-link').style.display='none';
-    // auto login
-    await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:user,password:pass})});
-    window.location.href='/';
-  } else {
-    showErr(err,d.error||'สร้างบัญชีไม่ได้');
-  }
-}
-
-checkSetupNeeded();
-document.getElementById('inp-user').focus();
+init();
 </script>
 </body>
 </html>
