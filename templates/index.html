@@ -637,60 +637,71 @@ function readCSV(file) {
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    let text = e.target.result;
-    // strip BOM (รองรับ double BOM จาก backup)
-    text = text.replace(/^(\uFEFF)+/, '');
+    importFileRaw = e.target.result;
+    let text = importFileRaw.replace(/^(\uFEFF)+/, '');
 
     const lines = text.trim().split('\n').map(l => l.replace(/\r/,''));
     if (!lines.length) { showImpErr('ไฟล์ว่างเปล่า'); return; }
 
-    const EXPECTED = ['วันที่','ลูกค้า','สินค้า','ราคาปกติ','ราคาจริง','ส่วนลด','รวมบิล','ช่องทาง','หมายเหตุ'];
     const header = lines[0].split(',');
-    const missing = EXPECTED.filter(h => !header.includes(h));
-    if (missing.length) {
-      showImpErr(`header ไม่ตรง — ต้องมี: [${EXPECTED.map(h=>"'"+h+"'").join(', ')}]`); return;
+
+    // detect format
+    const BACKUP_COLS  = ['วันที่','ลูกค้า','สินค้า','ราคาปกติ','ราคาจริง'];
+    const LEGACY_COLS  = ['จำนวน','ชื่อ','รายการ'];
+
+    const isBackup = BACKUP_COLS.every(h => header.some(c => c.includes(h)));
+    const isLegacy = LEGACY_COLS.every(h => header.some(c => c.includes(h)));
+
+    if (!isBackup && !isLegacy) {
+      showImpErr(`ไม่รู้จัก format — header ที่พบ: [${header.map(h=>"'"+h+"'").join(', ')}]`); return;
     }
 
-    const idx = {};
-    EXPECTED.forEach(h => idx[h] = header.indexOf(h));
+    importFormat = isBackup ? 'backup' : 'legacy';
 
-    importRows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',');
-      if (!cols[idx['วันที่']] && !cols[idx['ลูกค้า']]) continue; // summary/blank row
-      if (!cols[idx['รวมบิล']]) continue; // item row (not first of bill)
-      importRows.push({
-        date:     cols[idx['วันที่']].trim(),
-        customer: cols[idx['ลูกค้า']].trim(),
-        product:  cols[idx['สินค้า']].trim(),
-        actual:   parseInt(cols[idx['ราคาจริง']]) || 0,
-        total:    parseInt(cols[idx['รวมบิล']])   || 0,
-        method:   cols[idx['ช่องทาง']].trim() || 'bank',
-        note:     cols[idx['หมายเหตุ']].trim() || '',
-      });
-    }
+    // badge
+    const fmtBadge = isBackup
+      ? '<span style="background:rgba(34,211,238,.15);color:var(--cyan);padding:2px 8px;border-radius:4px;font-size:10px">📦 Backup format</span>'
+      : '<span style="background:rgba(139,92,246,.15);color:var(--purple3);padding:2px 8px;border-radius:4px;font-size:10px">📊 Google Sheet format</span>';
 
-    if (!importRows.length) { showImpErr('ไม่พบข้อมูลบิลในไฟล์'); return; }
+    // preview
+    const previewLines = lines.slice(1, 6).filter(Boolean);
+    const previewHtml = `<table style="width:100%;border-collapse:collapse">
+      <tr>${header.slice(0,5).map(h=>`<th style="padding:5px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;font-size:10px">${h}</th>`).join('')}</tr>
+      ${previewLines.map(line => {
+        const cols = line.split(',');
+        return `<tr>${cols.slice(0,5).map(c=>`<td style="padding:4px 8px;font-size:10px;color:var(--text)">${c}</td>`).join('')}</tr>`;
+      }).join('')}
+    </table>`;
 
-    // Preview
-    const previewData = importRows.slice(0,5);
-    document.getElementById('imp-preview-table').innerHTML =
-      `<table style="width:100%;border-collapse:collapse">
-        <tr>${['วันที่','ลูกค้า','สินค้า','จริง','รวม'].map(h=>`<th style="padding:5px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">${h}</th>`).join('')}</tr>
-        ${previewData.map(r=>`<tr>
-          <td style="padding:4px 8px;color:var(--muted)">${r.date.slice(0,10)}</td>
-          <td style="padding:4px 8px">${r.customer}</td>
-          <td style="padding:4px 8px">${r.product}</td>
-          <td style="padding:4px 8px;color:var(--green)">${r.actual.toLocaleString()}</td>
-          <td style="padding:4px 8px;color:var(--cyan)">${r.total.toLocaleString()}</td>
-        </tr>`).join('')}
-      </table>`;
+    document.getElementById('imp-preview-table').innerHTML = previewHtml;
     document.getElementById('imp-preview').style.display = 'block';
+
+    // count data rows
+    const dataRows = lines.slice(1).filter(l => l.trim()).length;
 
     document.getElementById('imp-result').style.display = 'none';
     const btn = document.getElementById('imp-btn');
     btn.disabled = false; btn.style.opacity = '1';
-    btn.textContent = `📦 นำเข้าข้อมูล (${importRows.length} บิล)`;
+    btn.innerHTML = `📦 นำเข้าข้อมูล (${dataRows} รายการ) &nbsp;${fmtBadge}`;
+
+    // parse rows only for backup format
+    if (isBackup) {
+      const EXPECTED = ['วันที่','ลูกค้า','สินค้า','ราคาปกติ','ราคาจริง','ส่วนลด','รวมบิล','ช่องทาง','หมายเหตุ'];
+      const idx = {};
+      EXPECTED.forEach(h => idx[h] = header.findIndex(c => c.includes(h)));
+      importRows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        if (!cols[idx['วันที่']] && !cols[idx['ลูกค้า']]) continue;
+        if (!cols[idx['รวมบิล']]) continue;
+        importRows.push({
+          date: cols[idx['วันที่']].trim(), customer: cols[idx['ลูกค้า']].trim(),
+          product: cols[idx['สินค้า']].trim(), actual: parseInt(cols[idx['ราคาจริง']]) || 0,
+          total: parseInt(cols[idx['รวมบิล']]) || 0,
+          method: cols[idx['ช่องทาง']].trim() || 'bank', note: cols[idx['หมายเหตุ']].trim() || '',
+        });
+      }
+    }
   };
   reader.readAsText(file, 'utf-8');
 }
@@ -706,36 +717,56 @@ function showImpErr(msg) {
   document.getElementById('imp-btn').style.opacity = '.5';
 }
 
+let importFileRaw = '';
+let importFormat  = 'backup'; // 'backup' | 'legacy'
+
 async function doImport() {
-  if (!importRows.length) return;
   const btn = document.getElementById('imp-btn');
   const res = document.getElementById('imp-result');
   btn.disabled = true; btn.textContent = '⏳ กำลังนำเข้า...';
 
-  let imported = 0, skipped = 0, failed = 0;
-  for (const row of importRows) {
-    try {
-      const r = await fetch('/api/import/order', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(row),
-      });
-      const d = await r.json();
-      if (d.success)       imported++;
-      else if (d.skipped)  skipped++;
-      else                 failed++;
-    } catch { failed++; }
+  if (importFormat === 'legacy') {
+    // ส่งทั้งไฟล์ไปให้ backend parse
+    const r = await fetch('/api/import/legacy_csv', {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain; charset=utf-8'},
+      body: importFileRaw,
+    });
+    const d = await r.json();
+    res.style.display = 'block';
+    const ok = d.success && d.failed === 0;
+    res.style.background = ok ? 'rgba(16,185,129,.1)' : 'rgba(245,158,11,.08)';
+    res.style.border      = ok ? '1px solid rgba(16,185,129,.3)' : '1px solid rgba(245,158,11,.25)';
+    res.style.color        = ok ? 'var(--green)' : '#fcd34d';
+    if (d.success) {
+      res.innerHTML = `✅ นำเข้าสำเร็จ <strong>${d.imported}</strong> รายการ &nbsp;|&nbsp; ข้ามซ้ำ ${d.skipped} &nbsp;|&nbsp; ผิดพลาด ${d.failed}`;
+      if (d.imported > 0) { await loadDashboard(); await loadTable(); }
+    } else {
+      res.innerHTML = '❌ ' + (d.error || 'เกิดข้อผิดพลาด');
+    }
+  } else {
+    // backup format — row by row
+    if (!importRows.length) return;
+    let imported = 0, skipped = 0, failed = 0;
+    for (const row of importRows) {
+      try {
+        const r = await fetch('/api/import/order', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(row),
+        });
+        const d = await r.json();
+        if (d.success) imported++; else if (d.skipped) skipped++; else failed++;
+      } catch { failed++; }
+    }
+    res.style.display = 'block';
+    const ok = failed === 0;
+    res.style.background = ok ? 'rgba(16,185,129,.1)' : 'rgba(245,158,11,.08)';
+    res.style.border      = ok ? '1px solid rgba(16,185,129,.3)' : '1px solid rgba(245,158,11,.25)';
+    res.style.color        = ok ? 'var(--green)' : '#fcd34d';
+    res.innerHTML = `✅ นำเข้าสำเร็จ <strong>${imported}</strong> บิล &nbsp;|&nbsp; ข้ามซ้ำ ${skipped} &nbsp;|&nbsp; ผิดพลาด ${failed}`;
+    if (imported > 0) { await loadDashboard(); await loadTable(); }
   }
-
-  res.style.display = 'block';
-  const allOk = failed === 0;
-  res.style.background = allOk ? 'rgba(16,185,129,.1)' : 'rgba(245,158,11,.08)';
-  res.style.border      = allOk ? '1px solid rgba(16,185,129,.3)' : '1px solid rgba(245,158,11,.25)';
-  res.style.color        = allOk ? 'var(--green)' : '#fcd34d';
-  res.innerHTML = `✅ นำเข้าสำเร็จ <strong>${imported}</strong> บิล &nbsp;|&nbsp; ข้ามซ้ำ ${skipped} &nbsp;|&nbsp; ผิดพลาด ${failed}`;
-
   btn.textContent = '✅ เสร็จสิ้น';
-  if (imported > 0) { await loadDashboard(); await loadTable(); }
 }
 
 init();

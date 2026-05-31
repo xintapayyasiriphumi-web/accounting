@@ -66,27 +66,18 @@ with app.app_context():
 
 # ── Products ───────────────────────────────────────────────────────
 PRODUCTS = [
-    {"key":"SupportX",         "name":"👑 SupportX",             "price":4999},
-    {"key":"Custom Setting",   "name":"🛠️ Custom Setting",       "price":1000},
-
-    {"key":"Max Pack",         "name":"💎 Max Pack",             "price":799},
-    {"key":"Performance Pack", "name":"🚀 Performance Pack",     "price":649},
-    {"key":"Pro Pack",         "name":"⚡ Pro Pack",             "price":629},
-
-    {"key":"GOATX",            "name":"🐐 G.O.A.T.X",           "price":429},
-    {"key":"ULTIMATEXPLUS",    "name":"💠 ULTIMATEXPLUS",        "price":259},
-    {"key":"ULTIMATEXXPLUS",   "name":"💎 ULTIMATEX+PLUS",       "price":629},
-    {"key":"ULTIMATEX",        "name":"🔥 ULTIMATEX",            "price":399},
-
-    {"key":"SHXV2",            "name":"🚀 SHX V.2",             "price":309},
-    {"key":"SHXV1",            "name":"⚡ SHX V.1",             "price":159},
-    {"key":"Dota V1",          "name":"🎮 Dota V.1",            "price":159},
-
-    {"key":"Windows OS",       "name":"🖥️ Windows OS",          "price":250},
-    {"key":"Windows Addon",    "name":"🔧 Windows Addon",        "price":150},
-    {"key":"Windows 10/11",    "name":"💻 Windows 10/11",        "price":99},
-
-    {"key":"Reshade",          "name":"🎨 Reshade",             "price":39},
+    {"key":"SupportX",         "name":"SupportX",          "price":4999},
+    {"key":"Custom Setting",   "name":"Custom Setting",     "price":1000},
+    {"key":"Max Pack",         "name":"Max Pack",           "price":799},
+    {"key":"Performance Pack", "name":"Performance Pack",   "price":649},
+    {"key":"Pro Pack",         "name":"Pro Pack",           "price":629},
+    {"key":"GOATX",            "name":"🐐 G.O.A.T.X",       "price":429},
+    {"key":"ULTIMATEXPLUS",    "name":"💎 ULTIMATEXPLUS",    "price":259},
+    {"key":"ULTIMATEXXPLUS",   "name":"💎 ULTIMATEX+PLUS",   "price":629},
+    {"key":"ULTIMATEX",        "name":"🔥 ULTIMATEX",        "price":399},
+    {"key":"SHXV2",            "name":"🚀 Shx V.2",          "price":309},
+    {"key":"SHXV1",            "name":"⚡ Shx V.1",          "price":159},
+    {"key":"Reshade",          "name":"Reshade",            "price":39},
 ]
 PROD_MAP = {p["key"]: p for p in PRODUCTS}
 
@@ -317,6 +308,106 @@ def api_export():
     )
 
 
+
+
+# ── API: Import Legacy CSV (Google Sheet format) ──────────────────
+# Format: วันที่,จำนวนเงิน (บาท),ชื่อลูกค้า,รายการ,หมายเหตุ ( ธนาคาร / wallet )
+@app.route("/api/import/legacy_csv", methods=["POST"])
+@login_required
+def api_import_legacy():
+    import csv as csvlib, io as io2
+
+    raw   = request.data.decode("utf-8-sig").lstrip("\ufeff")
+    lines = raw.splitlines()
+    if not lines:
+        return jsonify({"success": False, "error": "ไฟล์ว่าง"})
+
+    reader = csvlib.DictReader(lines)
+    # normalize header keys
+    rows = list(reader)
+
+    # detect header
+    raw_headers = reader.fieldnames or []
+    def find_col(keywords):
+        for h in raw_headers:
+            if any(k in h for k in keywords):
+                return h
+        return None
+
+    col_date   = find_col(["วันที่","date"])
+    col_amount = find_col(["จำนวน","amount","บาท"])
+    col_cust   = find_col(["ชื่อ","ลูกค้า","customer","name"])
+    col_prod   = find_col(["รายการ","สินค้า","product","item"])
+    col_method = find_col(["หมาย","bank","wallet","method","ช่องทาง"])
+
+    missing = [n for n, c in [("วันที่", col_date), ("จำนวนเงิน", col_amount),
+                               ("ชื่อลูกค้า", col_cust), ("รายการ", col_prod)] if not c]
+    if missing:
+        return jsonify({"success": False, "error": f"ไม่พบคอลัมน์: {missing}"})
+
+    imported = skipped = failed = 0
+    for row in rows:
+        try:
+            date_raw   = (row.get(col_date)   or "").strip()
+            amount_raw = (row.get(col_amount)  or "0").strip().replace(",", "")
+            customer   = (row.get(col_cust)    or "").strip()
+            product    = (row.get(col_prod)    or "").strip()
+            method_raw = (row.get(col_method)  or "bank").strip().lower()
+
+            if not date_raw or not customer:
+                continue
+
+            # parse DD/MM/YYYY or YYYY-MM-DD
+            if "/" in date_raw:
+                parts = date_raw.split("/")
+                if len(parts) == 3:
+                    d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+                    if y < 100: y += 2000
+                    dt = datetime(y, m, d, 12, 0, tzinfo=BKK)
+                else:
+                    continue
+            else:
+                dt = datetime.strptime(date_raw[:10], "%Y-%m-%d").replace(
+                    hour=12, tzinfo=BKK)
+
+            actual = int(float(amount_raw)) if amount_raw else 0
+            method = "truemoney" if "wallet" in method_raw else "bank"
+
+            # dedup: same customer + same date (day level)
+            exists = Order.query.filter(
+                Order.customer == customer,
+                db.func.date(Order.created_at) == dt.date(),
+                Order.items.any(OrderItem.product_name == product),
+            ).first()
+            if exists:
+                skipped += 1
+                continue
+
+            # match product
+            prod_obj = next(
+                (p for p in PRODUCTS if
+                 p["name"].lower() == product.lower() or
+                 p["key"].lower()  == product.lower()),
+                {"key": "CUSTOM", "name": product, "price": actual}
+            )
+
+            order = Order(customer=customer, method=method, note="", created_at=dt)
+            db.session.add(order)
+            db.session.add(OrderItem(
+                order        = order,
+                product_key  = prod_obj["key"],
+                product_name = product,
+                list_price   = prod_obj["price"],
+                actual_price = actual,
+            ))
+            db.session.commit()
+            imported += 1
+
+        except Exception as e:
+            db.session.rollback()
+            failed += 1
+
+    return jsonify({"success": True, "imported": imported, "skipped": skipped, "failed": failed})
 
 # ── API: Import order from CSV backup ─────────────────────────────
 @app.route("/api/import/order", methods=["POST"])
