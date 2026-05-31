@@ -1,18 +1,45 @@
-from flask import Flask, request, jsonify, render_template_string, send_file
+from flask import Flask, request, jsonify, render_template_string, send_file, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 from datetime import datetime, timezone, timedelta
-import csv, io, os, json
+import csv, io, os, json, secrets
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:///insidex.db"
 ).replace("postgres://", "postgresql://")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
 db = SQLAlchemy(app)
 BKK = timezone(timedelta(hours=7))
 
 # ── Models ─────────────────────────────────────────────────────────
+class User(db.Model):
+    __tablename__ = "users"
+    id         = db.Column(db.Integer, primary_key=True)
+    username   = db.Column(db.String(80), unique=True, nullable=False)
+    password   = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(BKK))
+
+# ── Auth helpers ────────────────────────────────────────────────────
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated
+
+def current_user():
+    return User.query.get(session.get("user_id"))
+
 # Order = 1 บิล (1 ลูกค้า อาจมีหลายสินค้า)
 class Order(db.Model):
     __tablename__ = "orders"
@@ -58,6 +85,9 @@ with app.app_context():
 
 # ── Products ───────────────────────────────────────────────────────
 PRODUCTS = [
+    {"key":"Max Pack",          "name":"Max Pack",       "price":799},
+    {"key":"Performance Pack",          "name":"Performance Pack",       "price":649},
+    {"key":"Pro Pack",          "name":"Pro Pack",       "price":629},
     {"key":"GOATX",          "name":"🐐 G.O.A.T.X",       "price":429},
     {"key":"ULTIMATEXPLUS",   "name":"💎 ULTIMATEXPLUS",    "price":259},
     {"key":"ULTIMATEXXPLUS",  "name":"💎 ULTIMATEX+PLUS",   "price":629},
@@ -88,13 +118,76 @@ def order_to_dict(o):
         } for i in o.items],
     }
 
+# ── Auth Routes ────────────────────────────────────────────────────
+@app.route("/login")
+def login_page():
+    if session.get("user_id"):
+        return redirect("/")
+    return render_template_string(open("templates/login.html").read())
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    d        = request.json or {}
+    username = (d.get("username") or "").strip().lower()
+    password = d.get("password") or ""
+    user     = User.query.filter_by(username=username).first()
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({"success": False, "error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"}), 401
+    session.permanent = True
+    session["user_id"]  = user.id
+    session["username"] = user.username
+    return jsonify({"success": True, "username": user.username})
+
+@app.route("/api/auth/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"success": True})
+
+@app.route("/api/auth/me")
+def api_me():
+    if not session.get("user_id"):
+        return jsonify({"logged_in": False})
+    return jsonify({"logged_in": True, "username": session.get("username")})
+
+@app.route("/api/auth/change_password", methods=["POST"])
+@login_required
+def api_change_password():
+    d        = request.json or {}
+    old_pw   = d.get("old_password", "")
+    new_pw   = d.get("new_password", "")
+    user     = current_user()
+    if not check_password_hash(user.password, old_pw):
+        return jsonify({"success": False, "error": "รหัสผ่านเดิมไม่ถูกต้อง"}), 400
+    if len(new_pw) < 6:
+        return jsonify({"success": False, "error": "รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร"}), 400
+    user.password = generate_password_hash(new_pw)
+    db.session.commit()
+    return jsonify({"success": True})
+
+# สร้าง admin ครั้งแรก (ใช้ได้แค่ถ้ายังไม่มี user เลย)
+@app.route("/api/auth/setup", methods=["POST"])
+def api_setup():
+    if User.query.count() > 0:
+        return jsonify({"success": False, "error": "มี admin อยู่แล้ว"}), 403
+    d        = request.json or {}
+    username = (d.get("username") or "admin").strip().lower()
+    password = d.get("password") or ""
+    if len(password) < 6:
+        return jsonify({"success": False, "error": "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"}), 400
+    user = User(username=username, password=generate_password_hash(password))
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({"success": True, "username": username})
+
 # ── API: Products ──────────────────────────────────────────────────
 @app.route("/api/products")
+@login_required
 def api_products():
     return jsonify(PRODUCTS)
 
 # ── API: Orders list ───────────────────────────────────────────────
 @app.route("/api/orders", methods=["GET"])
+@login_required
 def api_list():
     page  = int(request.args.get("page", 1))
     limit = int(request.args.get("limit", 15))
@@ -123,6 +216,7 @@ def api_list():
 
 # ── API: Create order (multi-item) ─────────────────────────────────
 @app.route("/api/orders", methods=["POST"])
+@login_required
 def api_create():
     d        = request.json or {}
     customer = (d.get("customer") or "").strip()
@@ -159,6 +253,7 @@ def api_create():
 
 # ── API: Delete order ──────────────────────────────────────────────
 @app.route("/api/orders/<int:oid>", methods=["DELETE"])
+@login_required
 def api_delete(oid):
     o = Order.query.get_or_404(oid)
     db.session.delete(o)
@@ -167,6 +262,7 @@ def api_delete(oid):
 
 # ── API: Update order item price ────────────────────────────────────
 @app.route("/api/order_items/<int:iid>", methods=["PATCH"])
+@login_required
 def api_patch_item(iid):
     item = OrderItem.query.get_or_404(iid)
     d    = request.json or {}
@@ -177,6 +273,7 @@ def api_patch_item(iid):
 
 # ── API: Dashboard ─────────────────────────────────────────────────
 @app.route("/api/dashboard")
+@login_required
 def api_dashboard():
     now         = datetime.now(BKK)
     today       = now.date()
@@ -220,6 +317,7 @@ def api_dashboard():
 
 # ── API: Export CSV ────────────────────────────────────────────────
 @app.route("/api/export/csv")
+@login_required
 def api_export():
     month = request.args.get("month", "")
     query = Order.query.order_by(Order.created_at.desc())
@@ -258,6 +356,7 @@ def api_export():
     )
 
 @app.route("/")
+@login_required
 def index():
     return render_template_string(open("templates/index.html").read())
 
