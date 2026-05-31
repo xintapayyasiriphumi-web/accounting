@@ -85,6 +85,8 @@ with app.app_context():
 
 # ── Products ───────────────────────────────────────────────────────
 PRODUCTS = [
+    {"key":"SupportX",          "name":"SupportX",       "price":4999},
+    {"key":"Custom Setting",          "name":"Custom Setting",       "price":1000},
     {"key":"Max Pack",          "name":"Max Pack",       "price":799},
     {"key":"Performance Pack",          "name":"Performance Pack",       "price":649},
     {"key":"Pro Pack",          "name":"Pro Pack",       "price":629},
@@ -94,6 +96,7 @@ PRODUCTS = [
     {"key":"ULTIMATEX",       "name":"🔥 ULTIMATEX",        "price":399},
     {"key":"SHXV2",           "name":"🚀 Shx V.2",          "price":309},
     {"key":"SHXV1",           "name":"⚡ Shx V.1",          "price":159},
+    {"key":"Reshade",           "name":"Reshade",          "price":39},
 ]
 PROD_MAP = {p["key"]: p for p in PRODUCTS}
 
