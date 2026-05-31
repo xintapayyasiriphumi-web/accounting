@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone, timedelta
-import csv, io, os
+import csv, io, os, json
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
@@ -12,194 +12,249 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 BKK = timezone(timedelta(hours=7))
 
-# ── Models ────────────────────────────────────────────
+# ── Models ─────────────────────────────────────────────────────────
+# Order = 1 บิล (1 ลูกค้า อาจมีหลายสินค้า)
+class Order(db.Model):
+    __tablename__ = "orders"
+    id          = db.Column(db.Integer, primary_key=True)
+    created_at  = db.Column(db.DateTime, default=lambda: datetime.now(BKK))
+    customer    = db.Column(db.String(120), nullable=False)
+    method      = db.Column(db.String(40),  default="bank")
+    note        = db.Column(db.String(255), default="")
+    items       = db.relationship("OrderItem", backref="order", cascade="all,delete-orphan")
+
+    @property
+    def total_list(self):
+        return sum(i.list_price for i in self.items)
+
+    @property
+    def total_actual(self):
+        return sum(i.actual_price for i in self.items)
+
+class OrderItem(db.Model):
+    __tablename__ = "order_items"
+    id           = db.Column(db.Integer, primary_key=True)
+    order_id     = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False)
+    product_key  = db.Column(db.String(60),  nullable=False)
+    product_name = db.Column(db.String(120), nullable=False)
+    list_price   = db.Column(db.Integer, nullable=False)
+    actual_price = db.Column(db.Integer, nullable=False)
+
+# backward-compat: keep old Transaction table readable
 class Transaction(db.Model):
     __tablename__ = "transactions"
     id          = db.Column(db.Integer, primary_key=True)
     created_at  = db.Column(db.DateTime, default=lambda: datetime.now(BKK))
-    customer    = db.Column(db.String(120), nullable=False)
-    product_key = db.Column(db.String(60),  nullable=False)
-    product_name= db.Column(db.String(120), nullable=False)
-    list_price  = db.Column(db.Integer,     nullable=False)  # ราคาปกติ
-    actual_price= db.Column(db.Integer,     nullable=False)  # ราคาที่รับจริง
-    method      = db.Column(db.String(40),  default="bank")
+    customer    = db.Column(db.String(120))
+    product_key = db.Column(db.String(60))
+    product_name= db.Column(db.String(120))
+    list_price  = db.Column(db.Integer)
+    actual_price= db.Column(db.Integer)
+    method      = db.Column(db.String(40), default="bank")
     note        = db.Column(db.String(255), default="")
 
 with app.app_context():
     db.create_all()
 
-# ── Products ──────────────────────────────────────────
+# ── Products ───────────────────────────────────────────────────────
 PRODUCTS = [
-    {"key":"GOATX",         "name":"🐐 G.O.A.T.X",        "price":429},
-    {"key":"ULTIMATEXPLUS",  "name":"💎 ULTIMATEXPLUS",     "price":259},
-    {"key":"ULTIMATEXXPLUS", "name":"💎 ULTIMATEX+PLUS",    "price":629},
-    {"key":"ULTIMATEX",      "name":"🔥 ULTIMATEX",         "price":399},
-    {"key":"SHXV2",          "name":"🚀 Shx V.2",           "price":309},
-    {"key":"SHXV1",          "name":"⚡ Shx V.1",           "price":159},
+    {"key":"GOATX",          "name":"🐐 G.O.A.T.X",       "price":429},
+    {"key":"ULTIMATEXPLUS",   "name":"💎 ULTIMATEXPLUS",    "price":259},
+    {"key":"ULTIMATEXXPLUS",  "name":"💎 ULTIMATEX+PLUS",   "price":629},
+    {"key":"ULTIMATEX",       "name":"🔥 ULTIMATEX",        "price":399},
+    {"key":"SHXV2",           "name":"🚀 Shx V.2",          "price":309},
+    {"key":"SHXV1",           "name":"⚡ Shx V.1",          "price":159},
 ]
+PROD_MAP = {p["key"]: p for p in PRODUCTS}
 
-# ── API ───────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────
+def order_to_dict(o):
+    return {
+        "id":           o.id,
+        "created_at":   o.created_at.strftime("%Y-%m-%d %H:%M"),
+        "customer":     o.customer,
+        "method":       o.method,
+        "note":         o.note,
+        "total_list":   o.total_list,
+        "total_actual": o.total_actual,
+        "discount":     o.total_list - o.total_actual,
+        "items": [{
+            "id":           i.id,
+            "product_key":  i.product_key,
+            "product_name": i.product_name,
+            "list_price":   i.list_price,
+            "actual_price": i.actual_price,
+            "discount":     i.list_price - i.actual_price,
+        } for i in o.items],
+    }
+
+# ── API: Products ──────────────────────────────────────────────────
 @app.route("/api/products")
 def api_products():
     return jsonify(PRODUCTS)
 
-@app.route("/api/transactions", methods=["GET"])
+# ── API: Orders list ───────────────────────────────────────────────
+@app.route("/api/orders", methods=["GET"])
 def api_list():
     page  = int(request.args.get("page", 1))
-    limit = int(request.args.get("limit", 20))
+    limit = int(request.args.get("limit", 15))
     q     = request.args.get("q", "").strip()
-    month = request.args.get("month", "")  # YYYY-MM
+    month = request.args.get("month", "")
 
-    query = Transaction.query.order_by(Transaction.created_at.desc())
+    query = Order.query.order_by(Order.created_at.desc())
     if q:
         query = query.filter(
             db.or_(
-                Transaction.customer.ilike(f"%{q}%"),
-                Transaction.product_name.ilike(f"%{q}%"),
-                Transaction.note.ilike(f"%{q}%"),
+                Order.customer.ilike(f"%{q}%"),
+                Order.note.ilike(f"%{q}%"),
+                Order.items.any(OrderItem.product_name.ilike(f"%{q}%")),
             )
         )
     if month:
         y, m = month.split("-")
         query = query.filter(
-            db.extract("year",  Transaction.created_at) == int(y),
-            db.extract("month", Transaction.created_at) == int(m),
+            db.extract("year",  Order.created_at) == int(y),
+            db.extract("month", Order.created_at) == int(m),
         )
 
-    total  = query.count()
-    items  = query.offset((page-1)*limit).limit(limit).all()
-    return jsonify({
-        "total": total,
-        "page":  page,
-        "items": [{
-            "id":           t.id,
-            "created_at":   t.created_at.strftime("%Y-%m-%d %H:%M"),
-            "customer":     t.customer,
-            "product_key":  t.product_key,
-            "product_name": t.product_name,
-            "list_price":   t.list_price,
-            "actual_price": t.actual_price,
-            "discount":     t.list_price - t.actual_price,
-            "method":       t.method,
-            "note":         t.note,
-        } for t in items],
-    })
+    total = query.count()
+    items = query.offset((page-1)*limit).limit(limit).all()
+    return jsonify({"total": total, "page": page, "items": [order_to_dict(o) for o in items]})
 
-@app.route("/api/transactions", methods=["POST"])
+# ── API: Create order (multi-item) ─────────────────────────────────
+@app.route("/api/orders", methods=["POST"])
 def api_create():
-    d = request.json or {}
-    prod = next((p for p in PRODUCTS if p["key"] == d.get("product_key")), None)
-    if not prod:
-        return jsonify({"success": False, "error": "ไม่พบสินค้า"}), 400
-    if not d.get("customer"):
+    d        = request.json or {}
+    customer = (d.get("customer") or "").strip()
+    cart     = d.get("items", [])   # [{product_key, actual_price}]
+
+    if not customer:
         return jsonify({"success": False, "error": "กรุณาใส่ชื่อลูกค้า"}), 400
+    if not cart:
+        return jsonify({"success": False, "error": "กรุณาเลือกสินค้าอย่างน้อย 1 รายการ"}), 400
 
-    t = Transaction(
-        customer     = d["customer"].strip(),
-        product_key  = prod["key"],
-        product_name = prod["name"],
-        list_price   = prod["price"],
-        actual_price = int(d.get("actual_price", prod["price"])),
-        method       = d.get("method", "bank"),
-        note         = d.get("note", "").strip(),
+    order = Order(
+        customer = customer,
+        method   = d.get("method", "bank"),
+        note     = (d.get("note") or "").strip(),
     )
-    db.session.add(t)
-    db.session.commit()
-    return jsonify({"success": True, "id": t.id})
+    db.session.add(order)
 
-@app.route("/api/transactions/<int:tid>", methods=["DELETE"])
-def api_delete(tid):
-    t = Transaction.query.get_or_404(tid)
-    db.session.delete(t)
+    for ci in cart:
+        prod = PROD_MAP.get(ci.get("product_key"))
+        if not prod:
+            db.session.rollback()
+            return jsonify({"success": False, "error": f"ไม่พบสินค้า {ci.get('product_key')}"}), 400
+        item = OrderItem(
+            order        = order,
+            product_key  = prod["key"],
+            product_name = prod["name"],
+            list_price   = prod["price"],
+            actual_price = int(ci.get("actual_price", prod["price"])),
+        )
+        db.session.add(item)
+
+    db.session.commit()
+    return jsonify({"success": True, "id": order.id, "total": order.total_actual})
+
+# ── API: Delete order ──────────────────────────────────────────────
+@app.route("/api/orders/<int:oid>", methods=["DELETE"])
+def api_delete(oid):
+    o = Order.query.get_or_404(oid)
+    db.session.delete(o)
     db.session.commit()
     return jsonify({"success": True})
 
-@app.route("/api/transactions/<int:tid>", methods=["PATCH"])
-def api_update(tid):
-    t = Transaction.query.get_or_404(tid)
-    d = request.json or {}
-    if "actual_price" in d: t.actual_price = int(d["actual_price"])
-    if "note"         in d: t.note         = d["note"]
-    if "customer"     in d: t.customer     = d["customer"]
+# ── API: Update order item price ────────────────────────────────────
+@app.route("/api/order_items/<int:iid>", methods=["PATCH"])
+def api_patch_item(iid):
+    item = OrderItem.query.get_or_404(iid)
+    d    = request.json or {}
+    if "actual_price" in d:
+        item.actual_price = max(0, int(d["actual_price"]))
     db.session.commit()
     return jsonify({"success": True})
 
+# ── API: Dashboard ─────────────────────────────────────────────────
 @app.route("/api/dashboard")
 def api_dashboard():
-    now   = datetime.now(BKK)
-    today = now.date()
+    now         = datetime.now(BKK)
+    today       = now.date()
     month_start = today.replace(day=1)
 
-    all_tx = Transaction.query.all()
+    all_orders = Order.query.all()
 
-    def rev(txs): return sum(t.actual_price for t in txs)
+    def total_rev(orders): return sum(o.total_actual for o in orders)
 
-    today_tx  = [t for t in all_tx if t.created_at.date() == today]
-    month_tx  = [t for t in all_tx if t.created_at.date() >= month_start]
+    today_orders = [o for o in all_orders if o.created_at.date() == today]
+    month_orders = [o for o in all_orders if o.created_at.date() >= month_start]
 
-    # daily for last 30 days
+    # daily 30 days
     daily = {}
     for i in range(29, -1, -1):
-        d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
-        daily[d] = 0
-    for t in all_tx:
-        k = t.created_at.strftime("%Y-%m-%d")
+        daily[(now - timedelta(days=i)).strftime("%Y-%m-%d")] = 0
+    for o in all_orders:
+        k = o.created_at.strftime("%Y-%m-%d")
         if k in daily:
-            daily[k] += t.actual_price
+            daily[k] += o.total_actual
 
-    # per product
-    prod_rev = {}
-    for p in PRODUCTS:
-        prod_rev[p["key"]] = {"name": p["name"], "count": 0, "revenue": 0}
-    for t in all_tx:
-        if t.product_key in prod_rev:
-            prod_rev[t.product_key]["count"]   += 1
-            prod_rev[t.product_key]["revenue"] += t.actual_price
+    # per product (from items)
+    all_items = OrderItem.query.all()
+    prod_rev = {p["key"]: {"name": p["name"], "count": 0, "revenue": 0} for p in PRODUCTS}
+    for i in all_items:
+        if i.product_key in prod_rev:
+            prod_rev[i.product_key]["count"]   += 1
+            prod_rev[i.product_key]["revenue"] += i.actual_price
 
     return jsonify({
-        "today_rev":   rev(today_tx),
-        "today_count": len(today_tx),
-        "month_rev":   rev(month_tx),
-        "month_count": len(month_tx),
-        "total_rev":   rev(all_tx),
-        "total_count": len(all_tx),
-        "total_discount": sum(t.list_price - t.actual_price for t in all_tx),
-        "daily":  [{"date": k, "rev": v} for k, v in daily.items()],
+        "today_rev":      total_rev(today_orders),
+        "today_count":    len(today_orders),
+        "month_rev":      total_rev(month_orders),
+        "month_count":    len(month_orders),
+        "total_rev":      total_rev(all_orders),
+        "total_count":    len(all_orders),
+        "total_discount": sum(o.total_list - o.total_actual for o in all_orders),
+        "daily":   [{"date": k, "rev": v} for k, v in daily.items()],
         "products": list(prod_rev.values()),
     })
 
+# ── API: Export CSV ────────────────────────────────────────────────
 @app.route("/api/export/csv")
 def api_export():
     month = request.args.get("month", "")
-    query = Transaction.query.order_by(Transaction.created_at.desc())
+    query = Order.query.order_by(Order.created_at.desc())
     if month:
         y, m = month.split("-")
         query = query.filter(
-            db.extract("year",  Transaction.created_at) == int(y),
-            db.extract("month", Transaction.created_at) == int(m),
+            db.extract("year",  Order.created_at) == int(y),
+            db.extract("month", Order.created_at) == int(m),
         )
-    items = query.all()
+    orders = query.all()
 
     buf = io.StringIO()
-    buf.write("\ufeff")  # BOM for Thai Excel
+    buf.write("\ufeff")
     w = csv.writer(buf)
-    w.writerow(["วันที่","ลูกค้า","สินค้า","ราคาปกติ","ราคาจริง","ส่วนลด","ช่องทาง","หมายเหตุ"])
-    for t in items:
-        w.writerow([
-            t.created_at.strftime("%Y-%m-%d %H:%M"),
-            t.customer, t.product_name,
-            t.list_price, t.actual_price,
-            t.list_price - t.actual_price,
-            t.method, t.note,
-        ])
+    w.writerow(["วันที่","ลูกค้า","สินค้า","ราคาปกติ/รายการ","ราคาจริง/รายการ","ส่วนลด/รายการ","รวมบิล","ช่องทาง","หมายเหตุ"])
+    for o in orders:
+        for idx, item in enumerate(o.items):
+            w.writerow([
+                o.created_at.strftime("%Y-%m-%d %H:%M") if idx == 0 else "",
+                o.customer if idx == 0 else "",
+                item.product_name,
+                item.list_price,
+                item.actual_price,
+                item.list_price - item.actual_price,
+                o.total_actual if idx == 0 else "",
+                o.method if idx == 0 else "",
+                o.note if idx == 0 else "",
+            ])
 
     buf.seek(0)
-    fname = f"insidex_{month or 'all'}.csv"
     return send_file(
         io.BytesIO(buf.read().encode("utf-8-sig")),
         mimetype="text/csv",
         as_attachment=True,
-        download_name=fname,
+        download_name=f"insidex_{month or 'all'}.csv",
     )
 
 @app.route("/")
