@@ -149,6 +149,127 @@ tr:last-child td{border-bottom:none}
 .empty{text-align:center;padding:36px;color:var(--muted);font-size:12px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ── Delete Confirm Modal ── */
+#del-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:500;align-items:center;justify-content:center}
+#del-modal.show{display:flex}
+.del-card{background:#12121e;border:1px solid rgba(244,63,94,.25);border-radius:20px;padding:28px;max-width:420px;width:92%;animation:fadeUp .2s ease both}
+.del-icon{width:52px;height:52px;background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px}
+.del-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text);margin-bottom:5px}
+.del-sub{font-size:11px;color:var(--muted);margin-bottom:18px}
+.del-info{background:rgba(244,63,94,.06);border:1px solid rgba(244,63,94,.15);border-radius:12px;padding:14px 16px;margin-bottom:20px}
+.del-info-row{display:flex;justify-content:space-between;align-items:flex-start;font-size:11px;margin-bottom:6px}
+.del-info-row:last-child{margin-bottom:0;padding-top:8px;border-top:1px solid rgba(244,63,94,.12);margin-top:6px}
+.del-info-label{color:var(--muted)}
+.del-info-val{color:var(--text);font-weight:600;text-align:right;max-width:220px}
+.del-info-total{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--red)}
+.del-actions{display:flex;gap:10px}
+.del-btn-cancel{flex:1;padding:11px;border:1px solid var(--border);border-radius:10px;background:var(--s2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.del-btn-cancel:hover{border-color:var(--border2);background:var(--s3)}
+.del-btn-confirm{flex:1;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,#f43f5e,#be123c);color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
+.del-btn-confirm:hover{opacity:.88}
+
+/* ── Toast ── */
+#toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:600;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid var(--border2);border-radius:100px;padding:10px 18px;font-size:12px;font-weight:600;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:all;animation:toastIn .25s ease both;white-space:nowrap}
+.toast.success{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.08)}
+.toast.undo{border-color:rgba(244,63,94,.3);background:rgba(244,63,94,.07);cursor:pointer}
+.toast-icon{font-size:15px}
+.toast-undo-btn{margin-left:8px;padding:3px 12px;background:rgba(244,63,94,.2);border:1px solid rgba(244,63,94,.4);border-radius:100px;color:var(--red);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit}
+.toast-bar{height:2px;background:rgba(244,63,94,.5);border-radius:2px;position:absolute;bottom:0;left:0;border-radius:0 0 100px 100px}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes toastOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(8px)}}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+
+/* Tablet (≤900px) */
+@media(max-width:900px){
+  .wrap{padding:16px 12px}
+
+  /* Nav: stack brand + buttons */
+  nav{flex-wrap:wrap;gap:10px;padding:12px 14px;border-radius:var(--r-lg)}
+  .nav-right{flex-wrap:wrap;gap:7px}
+  .month-pick{font-size:10px;padding:6px 10px}
+  .btn-export{font-size:10px;padding:6px 12px}
+
+  /* Stats: 2 col on tablet already handled at 700, but tighten gap */
+  .stats-row{gap:10px}
+
+  /* Table: hide less-important columns */
+  table th:nth-child(5),table td:nth-child(5),  /* ช่องทาง */
+  table th:nth-child(6),table td:nth-child(6)   /* หมายเหตุ */
+  {display:none}
+}
+
+/* Mobile (≤600px) */
+@media(max-width:600px){
+  .wrap{padding:12px 10px}
+
+  /* Nav: logo + name only, buttons wrap below */
+  nav{border-radius:14px;padding:10px 12px}
+  .nav-name{font-size:12px}
+  .nav-sub{display:none}
+  .btn-export{padding:6px 10px;font-size:9px}
+  #nav-username{display:none}
+
+  /* Stats: 2 col, smaller */
+  .stats-row{gap:8px}
+  .stat{padding:12px}
+  .stat-val{font-size:18px}
+  .stat-icon{font-size:15px;margin-bottom:5px}
+
+  /* Charts: single col already handled at 800px */
+  .chart-box{height:160px}
+
+  /* Product grid: 1 col on small mobile */
+  .prod-grid{grid-template-columns:1fr}
+
+  /* Table: further hide date detail, keep essentials */
+  table th:nth-child(1),table td:nth-child(1)   /* วันที่ */
+  {font-size:9px;padding:8px 6px;white-space:nowrap}
+  table th:nth-child(3),table td:nth-child(3)   /* สินค้า */
+  {max-width:120px}
+  .item-row{flex-wrap:wrap}
+
+  /* Panel body tighter */
+  .panel-body{padding:12px}
+  .panel-hd{padding:11px 12px}
+
+  /* Cart item */
+  .cart-item{flex-wrap:wrap;gap:6px}
+  .cart-price-inp{width:80px;font-size:11px}
+
+  /* Delete modal */
+  .del-card{padding:20px 16px;border-radius:16px}
+  .del-title{font-size:15px}
+  .del-info-val{max-width:160px;font-size:10px}
+  .del-actions{flex-direction:column;gap:8px}
+  .del-btn-cancel,.del-btn-confirm{width:100%;padding:12px}
+
+  /* Toast: shrink text, allow wrap */
+  .toast{white-space:normal;max-width:90vw;border-radius:14px;padding:10px 14px;font-size:11px;text-align:center;flex-wrap:wrap;justify-content:center;gap:6px}
+  .toast-undo-btn{margin-left:0}
+
+  /* Search bar */
+  .search-bar{flex-direction:column;gap:6px}
+  .search-bar input{font-size:11px}
+
+  /* Pagination */
+  .pg-row{flex-direction:column;gap:8px;align-items:flex-start}
+
+  /* Import modal */
+  #import-modal > div{padding:20px 16px}
+}
+
+/* Very small (≤380px) */
+@media(max-width:380px){
+  .stats-row{grid-template-columns:repeat(2,1fr);gap:6px}
+  .stat-val{font-size:16px}
+  nav{gap:7px}
+  .nav-right{gap:5px}
+  .btn-export{display:none} /* hide export buttons, keep month pick */
+  #nav-btn-export-csv{display:none}
+}
 </style>
 </head>
 <body>
@@ -327,6 +448,40 @@ tr:last-child td{border-bottom:none}
   </div>
 
 </div>
+
+<!-- Delete Confirm Modal -->
+<div id="del-modal">
+  <div class="del-card">
+    <div class="del-icon">🗑️</div>
+    <div class="del-title">ลบบิลนี้?</div>
+    <div class="del-sub">การลบไม่สามารถยกเลิกได้ (มี Undo 5 วิ)</div>
+    <div class="del-info">
+      <div class="del-info-row">
+        <span class="del-info-label">👤 ลูกค้า</span>
+        <span class="del-info-val" id="del-customer">—</span>
+      </div>
+      <div class="del-info-row">
+        <span class="del-info-label">📦 รายการ</span>
+        <span class="del-info-val" id="del-items">—</span>
+      </div>
+      <div class="del-info-row">
+        <span class="del-info-label">🕐 วันที่</span>
+        <span class="del-info-val" id="del-date">—</span>
+      </div>
+      <div class="del-info-row">
+        <span class="del-info-label">💰 รวม</span>
+        <span class="del-info-total" id="del-total">—</span>
+      </div>
+    </div>
+    <div class="del-actions">
+      <button class="del-btn-cancel" onclick="closeDelModal()">ยกเลิก</button>
+      <button class="del-btn-confirm" id="del-confirm-btn" onclick="confirmDelete()">🗑️ ลบบิล</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-wrap"></div>
 
 <!-- Import Backup Modal -->
 <div id="import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center">
@@ -595,11 +750,105 @@ async function saveItemPrice(id){
   await fetch('/api/order_items/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({actual_price:parseInt(inp.value)||0})});
   await loadTable(); await loadDashboard();
 }
-async function deleteOrder(id){
-  if(!confirm('ลบบิลนี้ทั้งหมด?'))return;
-  await fetch('/api/orders/'+id,{method:'DELETE'});
-  await loadTable(); await loadDashboard();
+// ── Delete Modal + Toast + Undo ───────────────────────────────────
+let _delPendingId   = null;   // order id รอยืนยัน
+let _undoTimer      = null;   // setTimeout สำหรับ undo
+let _undoCancelled  = false;  // flag ถ้ากด undo
+
+function deleteOrder(id) {
+  // หา order data จาก DOM ที่ render ไว้แล้ว
+  const row = document.querySelector(`button[onclick="deleteOrder(${id})"]`)?.closest('tr');
+  if (!row) return;
+
+  const customer = row.cells[1]?.textContent?.trim() || '—';
+  const items    = [...row.querySelectorAll('.item-row')].map(r =>
+    r.querySelector('.cart-item-name, span:first-child')?.textContent?.trim() || ''
+  ).filter(Boolean).join(', ') || row.cells[2]?.textContent?.trim() || '—';
+  const date     = row.cells[0]?.textContent?.trim() || '—';
+  const total    = row.cells[3]?.textContent?.trim().split('\n')[0]?.trim() || '—';
+
+  document.getElementById('del-customer').textContent = customer;
+  document.getElementById('del-items').textContent    = items.length > 60 ? items.slice(0, 60) + '…' : items;
+  document.getElementById('del-date').textContent     = date;
+  document.getElementById('del-total').textContent    = total;
+
+  _delPendingId = id;
+  document.getElementById('del-modal').classList.add('show');
 }
+
+function closeDelModal() {
+  document.getElementById('del-modal').classList.remove('show');
+  _delPendingId = null;
+}
+
+async function confirmDelete() {
+  if (!_delPendingId) return;
+  const id       = _delPendingId;
+  const customer = document.getElementById('del-customer').textContent;
+  const total    = document.getElementById('del-total').textContent;
+  closeDelModal();
+
+  _undoCancelled = false;
+  showUndoToast(id, customer, total);
+}
+
+function showUndoToast(id, customer, total) {
+  const wrap   = document.getElementById('toast-wrap');
+  const toastEl = document.createElement('div');
+  toastEl.className = 'toast undo';
+  toastEl.id = 'undo-toast-' + id;
+  toastEl.innerHTML = `
+    <span class="toast-icon">🗑️</span>
+    <span>ลบบิล <strong>@${customer}</strong> ${total}</span>
+    <button class="toast-undo-btn" onclick="cancelDelete(${id})">↩️ เลิกทำ</button>
+  `;
+  wrap.appendChild(toastEl);
+
+  // progress bar countdown 5s
+  const bar = document.createElement('div');
+  bar.className = 'toast-bar';
+  bar.style.cssText = 'width:100%;transition:width 4.8s linear';
+  toastEl.style.position = 'relative';
+  toastEl.appendChild(bar);
+  requestAnimationFrame(() => { bar.style.width = '0%'; });
+
+  _undoTimer = setTimeout(async () => {
+    if (_undoCancelled) return;
+    // ลบจริง
+    await fetch('/api/orders/' + id, { method: 'DELETE' });
+    removeToast(toastEl);
+    showSuccessToast(`🗑️ ลบบิล #${id} เรียบร้อย`);
+    await loadTable();
+    await loadDashboard();
+  }, 5000);
+}
+
+function cancelDelete(id) {
+  _undoCancelled = true;
+  clearTimeout(_undoTimer);
+  const el = document.getElementById('undo-toast-' + id);
+  if (el) removeToast(el);
+  showSuccessToast('↩️ ยกเลิกการลบแล้ว');
+}
+
+function showSuccessToast(msg) {
+  const wrap    = document.getElementById('toast-wrap');
+  const toastEl = document.createElement('div');
+  toastEl.className = 'toast success';
+  toastEl.innerHTML = `<span>${msg}</span>`;
+  wrap.appendChild(toastEl);
+  setTimeout(() => removeToast(toastEl), 3000);
+}
+
+function removeToast(el) {
+  el.style.animation = 'toastOut .2s ease both';
+  setTimeout(() => el.remove(), 200);
+}
+
+// ปิด modal เมื่อกด backdrop
+document.getElementById('del-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDelModal();
+});
 function prevPage(){if(currentPage>1){currentPage--;loadTable();}}
 function nextPage(){currentPage++;loadTable();}
 
