@@ -405,69 +405,88 @@ def api_import_legacy():
     if missing:
         return jsonify({"success": False, "error": f"ไม่พบคอลัมน์: {missing}"})
 
-    imported = skipped = failed = 0
+    # ── Group rows เข้า orders ก่อน (บิลนึงมีหลาย row ใน CSV) ──────
+    # export format: date+customer ใส่แค่แถวแรกของบิล แถวถัดไปว่าง
+    grouped = []   # list of (dt, customer, method, [(product, actual), ...])
+    cur_dt = cur_customer = cur_method = None
+
+    def parse_dt(date_raw):
+        date_raw = date_raw.strip()
+        if not date_raw:
+            return None
+        if "/" in date_raw:
+            parts = date_raw.split("/")
+            if len(parts) == 3:
+                d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+                if y < 100: y += 2000
+                return datetime(y, m, d, 12, 0, tzinfo=BKK)
+        else:
+            try:
+                raw = date_raw[:16]  # YYYY-MM-DD HH:MM
+                dt_naive = datetime.strptime(raw, "%Y-%m-%d %H:%M")
+                return dt_naive.replace(tzinfo=BKK)
+            except:
+                try:
+                    return datetime.strptime(date_raw[:10], "%Y-%m-%d").replace(hour=12, tzinfo=BKK)
+                except:
+                    pass
+        return None
+
     for row in rows:
+        date_raw   = (row.get(col_date)   or "").strip()
+        amount_raw = (row.get(col_amount)  or "0").strip().replace(",", "")
+        customer   = (row.get(col_cust)    or "").strip()
+        product    = (row.get(col_prod)    or "").strip()
+        method_raw = (row.get(col_method)  or "bank").strip().lower()
+
+        if not product:
+            continue
+
+        # แถวใหม่ = มี date หรือ customer → เริ่ม order ใหม่
+        if date_raw or customer:
+            dt = parse_dt(date_raw)
+            if dt is None or not customer:
+                continue
+            method = "truemoney" if "truemoney" in method_raw or "wallet" in method_raw else "bank"
+            cur_dt, cur_customer, cur_method = dt, customer, method
+            grouped.append((cur_dt, cur_customer, cur_method, []))
+
+        # แถวต่อเนื่อง (date+customer ว่าง) → เพิ่ม item เข้า order ปัจจุบัน
+        if not grouped or cur_dt is None:
+            continue
+
+        actual = int(float(amount_raw)) if amount_raw else 0
+        grouped[-1][3].append((product, actual))
+
+    # ── Import แต่ละ order ──────────────────────────────────────────
+    imported = skipped = failed = 0
+    for (dt, customer, method, items) in grouped:
+        if not items:
+            continue
         try:
-            date_raw   = (row.get(col_date)   or "").strip()
-            amount_raw = (row.get(col_amount)  or "0").strip().replace(",", "")
-            customer   = (row.get(col_cust)    or "").strip()
-            product    = (row.get(col_prod)    or "").strip()
-            method_raw = (row.get(col_method)  or "bank").strip().lower()
-
-            if not date_raw or not customer:
-                continue
-
-            # parse DD/MM/YYYY or YYYY-MM-DD
-            if "/" in date_raw:
-                parts = date_raw.split("/")
-                if len(parts) == 3:
-                    d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
-                    if y < 100: y += 2000
-                    dt = datetime(y, m, d, 12, 0, tzinfo=BKK)
-                else:
-                    continue
-            else:
-                dt = datetime.strptime(date_raw[:10], "%Y-%m-%d").replace(
-                    hour=12, tzinfo=BKK)
-
-            actual = int(float(amount_raw)) if amount_raw else 0
-            method = "truemoney" if "wallet" in method_raw else "bank"
-
-            # dedup: same customer + same date (day level)
-            exists = Order.query.filter(
-                Order.customer == customer,
-                db.func.date(Order.created_at) == dt.date(),
-                Order.items.any(OrderItem.product_name == product),
-            ).first()
-            if exists:
-                skipped += 1
-                continue
-
-            # match product
-            prod_obj = next(
-                (p for p in PRODUCTS if
-                 p["name"].lower() == product.lower() or
-                 p["key"].lower()  == product.lower()),
-                {"key": "CUSTOM", "name": product, "price": actual}
-            )
-
             order = Order(customer=customer, method=method, note="", created_at=dt)
             db.session.add(order)
-            db.session.add(OrderItem(
-                order        = order,
-                product_key  = prod_obj["key"],
-                product_name = product,
-                list_price   = prod_obj["price"],
-                actual_price = actual,
-            ))
+            for (product, actual) in items:
+                prod_obj = next(
+                    (p for p in PRODUCTS if
+                     p["name"].lower() == product.lower() or
+                     p["key"].lower()  == product.lower()),
+                    {"key": "CUSTOM", "name": product, "price": actual}
+                )
+                db.session.add(OrderItem(
+                    order        = order,
+                    product_key  = prod_obj["key"],
+                    product_name = product,
+                    list_price   = prod_obj["price"],
+                    actual_price = actual,
+                ))
             db.session.commit()
             imported += 1
-
         except Exception as e:
             db.session.rollback()
             failed += 1
 
-    return jsonify({"success": True, "imported": imported, "skipped": skipped, "failed": failed})
+    return jsonify({"success": True, "imported": imported, "skipped": 0, "failed": failed})
 
 
 # ── API: Bulk import backup CSV (ส่งครั้งเดียวทั้งหมด) ─────────────
