@@ -378,8 +378,9 @@ def api_import_legacy():
     else:
         raw = request.get_data(as_text=False).decode("utf-8-sig")
 
-    # strip BOM ทุกชั้น
-    raw = raw.lstrip("\ufeff")
+    # strip BOM ทุกชั้น (ไฟล์บางไฟล์มี double BOM)
+    while raw.startswith("\ufeff"):
+        raw = raw[1:]
     if not raw.strip():
         return jsonify({"success": False, "error": "ไฟล์ว่าง"})
 
@@ -515,14 +516,7 @@ def api_import_bulk():
             except ValueError:
                 failed += 1; continue
 
-            # dedup
-            exists = Order.query.filter(
-                Order.customer == customer,
-                Order.created_at >= dt.replace(second=0,  microsecond=0),
-                Order.created_at <  dt.replace(second=59, microsecond=999999),
-            ).first()
-            if exists:
-                skipped += 1; continue
+            # ไม่มี dedup — import ทุก row
 
             prod = next((p for p in PRODUCTS if p["name"] == product or p["key"] == product),
                         {"key": "CUSTOM", "name": product, "price": actual})
