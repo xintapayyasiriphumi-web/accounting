@@ -168,6 +168,14 @@ tr:last-child td{border-bottom:none}
 @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes toastOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(8px)}}
 
+/* ── Skeleton Loading ───────────────────────────────────────────── */
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton{background:linear-gradient(90deg,var(--s2) 25%,var(--s3) 50%,var(--s2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s ease infinite;border-radius:3px}
+.sk-row td{padding:10px 12px;border-bottom:1px solid var(--border)}
+.sk-cell{height:11px;border-radius:3px}
+.sk-stat{height:18px;width:65%;border-radius:3px}
+
 /* ── Responsive ─────────────────────────────────────────────────── */
 
 /* Tablet (≤900px) */
@@ -684,6 +692,16 @@ function onSearch(){
 }
 
 async function loadTable(){
+  const tbody=document.getElementById('tbl-body');
+  tbody.innerHTML=Array.from({length:8},()=>`
+    <tr class="sk-row">
+      <td><div class="skeleton sk-cell" style="width:55px"></div></td>
+      <td><div class="skeleton sk-cell" style="width:80px"></div></td>
+      <td><div class="skeleton sk-cell" style="width:120px"></div></td>
+      <td style="text-align:right"><div class="skeleton sk-cell" style="width:50px;margin-left:auto"></div></td>
+      <td><div class="skeleton sk-cell" style="width:40px"></div></td>
+      <td><div class="skeleton sk-cell" style="width:20px"></div></td>
+    </tr>`).join('');
   const params=new URLSearchParams({page:currentPage,limit:PER_PAGE,q:searchQ,month:filterMonth});
   const r=await fetch('/api/orders?'+params);
   const d=await r.json();
@@ -693,7 +711,6 @@ async function loadTable(){
   document.getElementById('pg-prev').disabled=currentPage===1;
   document.getElementById('pg-next').disabled=currentPage>=pages;
 
-  const tbody=document.getElementById('tbl-body');
   if(!d.items.length){tbody.innerHTML='<tr><td colspan="7" class="empty">ยังไม่มีรายการ</td></tr>';return;}
 
   tbody.innerHTML=d.items.map(o=>{
@@ -836,6 +853,10 @@ function nextPage(){currentPage++;loadTable();}
 
 // ── Dashboard ─────────────────────────────────────────
 async function loadDashboard(){
+  ['s-today-rev','s-month-rev','s-total-rev','s-discount'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML='<div class="skeleton sk-stat"></div>';
+  });
   const r=await fetch('/api/dashboard'); const d=await r.json();
   document.getElementById('s-today-rev').textContent=d.today_rev.toLocaleString()+' ฿';
   document.getElementById('s-today-cnt').textContent=d.today_count+' บิล';
