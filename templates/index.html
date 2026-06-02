@@ -39,7 +39,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:11px 1
 .stat.c{border-left-color:var(--cyan)}.stat.o{border-left-color:var(--gold)}
 .stat-icon{display:none}
 .stat-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;font-weight:500}
-.stat-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 .stat-sub{font-size:9px;color:var(--muted);margin-top:3px}
 .cg{color:var(--green)}.cp{color:var(--purple3)}.cc{color:var(--cyan)}.co{color:var(--gold)}
 
@@ -129,7 +129,7 @@ tr:last-child td{border-bottom:none}
 
 .items-list{display:flex;flex-direction:column;gap:3px}
 .item-row{display:flex;align-items:center;gap:5px;font-size:10px}
-.item-price{color:var(--green);font-weight:700;white-space:nowrap}
+.item-price{color:var(--green);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace}
 .item-disc{color:var(--red);font-size:9px}
 .edit-inp{width:80px;padding:3px 7px;background:#07070e;border:1px solid var(--purple);border-radius:5px;
   color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10px;outline:none;text-align:right}
@@ -730,7 +730,7 @@ async function loadTable(){
       <td style="font-weight:600;color:var(--cyan)">@${o.customer}</td>
       <td><div class="items-list">${itemsHtml}</div></td>
       <td style="text-align:right;white-space:nowrap">
-        <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--green)">${o.total_actual.toLocaleString()}฿</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums">${o.total_actual.toLocaleString()}฿</span>
         ${o.discount>0?`<br><span style="font-size:9px;color:var(--red)">ลด ${o.discount.toLocaleString()}</span>`:''}
       </td>
       <td style="color:var(--muted);font-size:10px">${mLabel}</td>
