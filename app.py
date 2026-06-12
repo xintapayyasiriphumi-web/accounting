@@ -451,16 +451,6 @@ def api_import_legacy():
             actual = int(float(amount_raw)) if amount_raw else 0
             method = "truemoney" if "wallet" in method_raw else "bank"
 
-            # dedup: same customer + same date (day level)
-            exists = Order.query.filter(
-                Order.customer == customer,
-                db.func.date(Order.created_at) == dt.date(),
-                Order.items.any(OrderItem.product_name == product),
-            ).first()
-            if exists:
-                skipped += 1
-                continue
-
             # match product
             prod_obj = next(
                 (p for p in PRODUCTS if
@@ -515,14 +505,6 @@ def api_import_bulk():
                 failed += 1; continue
 
             # dedup
-            exists = Order.query.filter(
-                Order.customer == customer,
-                Order.created_at >= dt.replace(second=0,  microsecond=0),
-                Order.created_at <  dt.replace(second=59, microsecond=999999),
-            ).first()
-            if exists:
-                skipped += 1; continue
-
             prod = next((p for p in PRODUCTS if p["name"] == product or p["key"] == product),
                         {"key": "CUSTOM", "name": product, "price": actual})
 
