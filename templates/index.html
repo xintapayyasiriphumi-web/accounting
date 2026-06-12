@@ -287,11 +287,33 @@ tr:last-child td{border-bottom:none}
     <button class="btn-export" onclick="openImport()">↑ Import</button>
     <span id="nav-username" style="font-size:10px;color:var(--muted);padding:5px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm)">—</span>
     <button onclick="openWH()" style="padding:5px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit" title="Discord Webhook">⌖</button>
+    <button onclick="openClear()" style="padding:5px 10px;background:var(--s2);border:1px solid rgba(244,63,94,.3);border-radius:var(--r-sm);color:var(--red);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit" title="ล้างข้อมูลทั้งหมด">⚠ Clear</button>
     <button onclick="doLogout()" style="padding:5px 10px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--red);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit">ออก</button>
   </div>
 </nav>
 
 
+
+<!-- Clear Data Modal -->
+<div id="clear-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--s1);border:1px solid var(--border);border-top:2px solid var(--red);border-radius:var(--r-md);padding:24px;max-width:400px;width:92%">
+    <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">ล้างข้อมูลทั้งหมด</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:18px;line-height:1.6">การล้างข้อมูลจะ<strong style="color:var(--red)">ลบบิลทุกรายการออกจากฐานข้อมูลถาวร</strong> ไม่สามารถกู้คืนได้ ควร Export CSV สำรองไว้ก่อน</div>
+    <div style="background:var(--s2);border:1px solid rgba(244,63,94,.2);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:18px;font-size:11px;color:var(--muted)">
+      พิมพ์ <code style="color:var(--red);background:#07070e;padding:1px 6px;border-radius:3px">CLEAR</code> เพื่อยืนยัน
+    </div>
+    <div style="margin-bottom:14px">
+      <input type="text" id="clear-confirm-inp" placeholder="พิมพ์ CLEAR ที่นี่" autocomplete="off"
+        style="width:100%;padding:9px 12px;background:#07070e;border:1px solid var(--border);border-radius:var(--r-sm);color:var(--red);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;letter-spacing:.1em"
+        oninput="document.getElementById('clear-exec-btn').disabled=this.value!=='CLEAR'"/>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeClear()" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--s2);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer">ยกเลิก</button>
+      <button id="clear-exec-btn" onclick="execClear()" disabled style="flex:1;padding:9px;border:none;border-radius:var(--r-sm);background:#be123c;color:#fff;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;opacity:.4;transition:.12s" onmouseenter="if(!this.disabled)this.style.background='#9f1239'" onmouseleave="this.style.background='#be123c'">ล้างข้อมูลทั้งหมด</button>
+    </div>
+    <div id="clear-result" style="margin-top:10px;font-size:11px;display:none"></div>
+  </div>
+</div>
 
 <!-- Webhook Settings Modal -->
 <div id="wh-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center">
@@ -1126,6 +1148,50 @@ async function doImport() {
   }
   btn.textContent = '✅ เสร็จสิ้น';
 }
+
+// ── Clear Data ────────────────────────────────────────────────────
+function openClear() {
+  document.getElementById('clear-modal').style.display = 'flex';
+  document.getElementById('clear-confirm-inp').value = '';
+  document.getElementById('clear-exec-btn').disabled = true;
+  document.getElementById('clear-exec-btn').style.opacity = '.4';
+  document.getElementById('clear-result').style.display = 'none';
+}
+function closeClear() {
+  document.getElementById('clear-modal').style.display = 'none';
+}
+async function execClear() {
+  const btn = document.getElementById('clear-exec-btn');
+  const res = document.getElementById('clear-result');
+  btn.disabled = true; btn.textContent = '⏳ กำลังล้าง...';
+  try {
+    const r = await fetch('/api/orders/clear_all', { method: 'DELETE',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({confirm: 'CLEAR'})
+    });
+    const d = await r.json();
+    if (d.success) {
+      res.style.cssText = 'display:block;color:var(--green);font-size:11px;margin-top:10px';
+      res.textContent = `✅ ลบแล้ว ${d.deleted} บิล เรียบร้อย`;
+      await loadDashboard(); await loadTable();
+      setTimeout(closeClear, 1500);
+    } else {
+      res.style.cssText = 'display:block;color:var(--red);font-size:11px;margin-top:10px';
+      res.textContent = '❌ ' + (d.error || 'เกิดข้อผิดพลาด');
+      btn.disabled = false; btn.textContent = 'ล้างข้อมูลทั้งหมด';
+    }
+  } catch(e) {
+    res.style.cssText = 'display:block;color:var(--red);font-size:11px;margin-top:10px';
+    res.textContent = '❌ เชื่อมต่อไม่ได้';
+    btn.disabled = false; btn.textContent = 'ล้างข้อมูลทั้งหมด';
+  }
+}
+
+// sync clear-exec-btn opacity with disabled state
+document.getElementById('clear-confirm-inp') && document.getElementById('clear-confirm-inp').addEventListener('input', function(){
+  const btn = document.getElementById('clear-exec-btn');
+  btn.style.opacity = this.value === 'CLEAR' ? '1' : '.4';
+});
 
 init();
 </script>
